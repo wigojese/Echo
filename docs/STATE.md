@@ -7,11 +7,13 @@ Updated: 2026-11-22. Branch: `claude/keen-volta-mjk5nm`.
 - This repository was empty before this branch. It holds **no** Stage 00 to 04 documents (`BRIEF.md`, `RISKS.md`, `SENSORY_RULES.md` and so on were never committed here).
   The master prompt says contradicting records must be reconciled. Whether Stages 00 to 04 were approved elsewhere is **UNVERIFIED** from this repo. Ask the user to confirm or supply them.
 - **Stage 05, visual identity exploration:** delivered in two rounds (see `design/stage05/`). **Closed.** The user selected **D, The Listening Plate** (EC-D-002). No features from other directions were named as permitted.
+- **Stage 07, production architecture:** **Approved** by the user on 2026-11-22 (EC-D-009).
+- **Stage 08, EC-L01 graybox:** delivered, awaiting approval. See `docs/STAGE08_GRAYBOX.md`.
 - **Stage 06, engine and acoustic feasibility spike:** **Approved as delivered** by the user on 2026-11-22 (EC-D-005). The engine comparison stays **BLOCKED**, the solver reference is **tested**. See `docs/STAGE06_SPIKE.md`.
 
 ## Pending stage
 
-Stage 07, production architecture and safety gates. Delivered, **awaiting approval**.
+Stage 08, EC-L01 graybox. Delivered, **awaiting your approval**. Stage 07 is approved (EC-D-009).
 
 ## Pinned versions
 

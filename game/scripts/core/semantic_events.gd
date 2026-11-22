@@ -10,6 +10,8 @@ const PREDATOR_STATE_CHANGED := &"predator_state_changed"
 const PLAYER_CAPTURED := &"player_captured"
 const EXIT_REACHED := &"exit_reached"
 const LEVEL_RESET := &"level_reset"
+const PING_REJECTED := &"ping_rejected"
+const LEVEL_TIMEOUT := &"level_timeout"
 
 const ALL: Array[StringName] = [
     PING_CAST,
@@ -19,4 +21,6 @@ const ALL: Array[StringName] = [
     PLAYER_CAPTURED,
     EXIT_REACHED,
     LEVEL_RESET,
+    PING_REJECTED,
+    LEVEL_TIMEOUT,
 ]

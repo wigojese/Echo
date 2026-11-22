@@ -106,3 +106,78 @@ func test_validator_rejects_sealed_exit() -> void:
     var geometry := {"half_width_m": 1.2, "walkable_strips": [[4, 6, 4, 14], [7.2, 6, 7.2, 14]]}
     var problems := LevelValidator.validate(level, geometry)
     _check("validator rejects a sealed exit with a readable message", problems.size() == 1 and "sealed" in problems[0], str(problems))
+
+
+# ---- Stage 08: simulation, mirrors tests/js/stage08.test.js. Never run in Godot yet. ----
+
+func _json(path: String) -> Dictionary:
+    return JSON.parse_string(FileAccess.get_file_as_string(path))
+
+
+func _l01() -> Simulation:
+    return Simulation.new(
+        _json("res://game/resources/levels/EC-L01.json"), _json("res://game/resources/levels/EC-L01-geometry.json")
+    )
+
+
+func _sealed() -> Simulation:
+    return Simulation.new(
+        _json("res://tests/fixtures/sealed_level.json"), _json("res://tests/fixtures/sealed_geometry.json")
+    )
+
+
+func _count(sim: Simulation, kind: StringName) -> int:
+    var n := 0
+    for e in sim.bus.history():
+        if e["kind"] == kind:
+            n += 1
+    return n
+
+
+func test_sim_cooldown_and_origin() -> void:
+    var sim := _l01()
+    sim.step([{"type": "ping"}])
+    for _i in range(4):
+        sim.step([])
+    sim.step([{"type": "ping"}])
+    _check("sim: second tap inside the cooldown is rejected visibly", _count(sim, SemanticEvents.PING_CAST) == 1 and _count(sim, SemanticEvents.PING_REJECTED) == 1)
+
+
+func test_sim_sealed_wall_not_heard() -> void:
+    var sim := _sealed()
+    var by_tick := {3: [{"type": "ping"}]}
+    sim.run_inputs(by_tick, 150)
+    _check("sim sealed wall: hidden predator not heard, no ghost", _count(sim, SemanticEvents.HEARD_PING) == 0 and sim.knowledge.ghosts.is_empty() and sim.predators[0].state == &"PATROL")
+
+
+func test_sim_replays_match_reference() -> void:
+    var a := _l01()
+    a.run_inputs(Simulation.group_replay(_json("res://reference/replays/A_heard_and_caught.json")))
+    var b := _l01()
+    b.run_inputs(Simulation.group_replay(_json("res://reference/replays/B_heard_and_escaped.json")))
+    _check("replay A is captured and replay B wins, as in the Node reference", a.state == &"CAPTURED" and b.state == &"WON", "%s / %s" % [a.state, b.state])
+    _check("replay A captured at tick 700 like the reference", a.tick == 701, str(a.tick))
+
+
+func test_sim_retry_resets_everything() -> void:
+    var sim := _l01()
+    sim.run_inputs(Simulation.group_replay(_json("res://reference/replays/A_heard_and_caught.json")))
+    sim.reset()
+    _check("retry: tick, state, memory and ghosts are reset", sim.tick == 0 and sim.state == &"RUNNING" and sim.knowledge.segments.is_empty() and sim.knowledge.ghosts.is_empty() and sim.predators[0].state == &"PATROL" and sim.bus.history().size() == 1)
+
+
+func test_sim_camera_independent_of_hidden_predator() -> void:
+    var level_b := _json("res://tests/fixtures/sealed_level.json")
+    level_b["predators"][0]["spawn_xy"] = [7.2, 13]
+    level_b["predators"][0]["patrol_waypoints"] = [[7.2, 13], [7.2, 7]]
+    var a := _sealed()
+    var b := Simulation.new(level_b, _json("res://tests/fixtures/sealed_geometry.json"))
+    var plan := {10: [{"type": "ping"}], 11: [{"type": "move", "dx": 0, "dy": -1}], 60: [{"type": "ping"}], 61: [{"type": "stop"}]}
+    var same := true
+    var director := CameraDirector.new()
+    for _k in range(300):
+        a.step(plan.get(a.tick, []))
+        b.step(plan.get(b.tick, []))
+        if director.frame(a.snapshot()) != director.frame(b.snapshot()) or a.snapshot().memory_segments != b.snapshot().memory_segments:
+            same = false
+    _check("sim camera firewall: different hidden predator positions, identical framing for 300 ticks", same)

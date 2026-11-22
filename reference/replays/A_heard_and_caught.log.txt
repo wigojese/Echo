@@ -1,0 +1,9 @@
+REPLAY A_heard_and_caught: 50 inputs, ended CAPTURED at tick 701 (23.4 s), 1 echoes, path 21.4 m
+  replay reproduces the live run exactly: true
+  tick  507  ping_cast  {"castId":1,"origin":[10.99728138029907,16.820839099648836],"edges":451,"cooldownUntil":545}
+  tick  537  heard_ping  {"predator":"listener-01","castId":1,"arrivalTick":537,"weightedCost":8.786,"origin":[10.99728138029907,16.820839099648836]}
+  tick  537  predator_state_changed  {"predator":"listener-01","from":"PATROL","to":"CURIOUS","reason":"heard ping 1"}
+  tick  643  predator_state_changed  {"predator":"listener-01","from":"CURIOUS","to":"CHASE","reason":"line of sight within 4 m for 6 ticks"}
+  tick  700  player_captured  {"predator":"listener-01","alertStart":643,"alertTicks":57,"lastHeardOrigin":[10.99728138029907,16.820839099648836],"lastHeardTick":537,"heardCastIds":[1]}
+  EXPLANATION: The listener heard echo 1 at tick 537, walked to where it was cast, and found you after a 1.90 s warning.
+  predator last_heard_origin=[10.99728138029907,16.820839099648836] last_heard_tick=537 last_seen_player_tick=700 investigations=1

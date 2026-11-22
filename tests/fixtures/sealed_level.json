@@ -1,0 +1,7 @@
+{
+  "schema_version": 1, "id": "EC-T-SEALED", "seed": 1, "world_bounds_metres": [0, 0, 24, 36],
+  "player": {"spawn_xy": [4, 10], "collision_radius_m": 0.28},
+  "goal": {"exit_xy": [4, 13], "trigger_radius_m": 0.8},
+  "rules": {"acoustic_cell_m": 0.25},
+  "predators": [{"id": "listener-01", "type": "LISTENER", "spawn_xy": [7.2, 10], "patrol_waypoints": [[7.2, 8], [7.2, 12]], "hearing_cost_limit_m": 11.0}]
+}

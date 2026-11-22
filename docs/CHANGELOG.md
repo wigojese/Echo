@@ -8,3 +8,8 @@
 - Engine chosen by the user: Godot 4.7, GDScript.
 - Stage 07 skeleton: modules, information firewall, event bus, replay format, style tokens, level validator, boot scene, test runner, CI file.
 - Corrected two tests during the run: the corner margin in Stage 06, and the sealed-exit fixture in Stage 07 (the side connector still reached the exit).
+
+- Stage 07 approved.
+- Stage 08 graybox: reference simulation (31 tests), browser graybox, two replays, evidence images, GDScript port (parse-checked only).
+- Adjusted one test threshold (tick 560 to 600) because the player had not yet walked 3 m, not because the simulation was wrong.
+- Added events `ping_rejected` and `level_timeout`.
