@@ -11,14 +11,14 @@ Updated: 2026-11-22. Branch: `claude/keen-volta-mjk5nm`.
 
 ## Pending stage
 
-Stage 07, production architecture. It cannot start in an engine until the engine is chosen (EC-D-004).
+Stage 07, production architecture and safety gates. Delivered, **awaiting approval**.
 
 ## Pinned versions
 
-None yet. No engine is installed and none has been chosen.
+Engine target **Godot 4.7, GDScript** (chosen by the user, EC-D-006). Not installed here, so the exact patch version is **not pinned**. Pin it when the project is first opened in Godot. `project.godot` was written by hand and is unverified.
 
 ## Active blockers
 
 1. Godot 4.7 and Unity 6.3 cannot be downloaded from the build sandbox (`godotengine.org`, `unity.com` unreachable).
 2. No Android SDK, `adb`, or physical phone is available.
-3. No engine has been chosen. Stage 07 needs an engine pinned.
+3. The engine patch version is not pinned and GDScript has never been executed (see `docs/TEST_REPORT.md`).

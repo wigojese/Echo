@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "art_system": "D The Listening Plate",
+  "palette": {
+    "plate_black": "#0B0D0B",
+    "substrate": "#151A16",
+    "paper_chalk": "#E6E0D2",
+    "fresh_contact": "#CDE9BB",
+    "active_afterglow": "#9FC19B",
+    "verified_memory": "#718B70",
+    "near_expired_residue": "#4E624F",
+    "caution_amber": "#F4BE70",
+    "confirmed_danger": "#E98158",
+    "exit": "#F1D17C",
+    "secondary_ui": "#AEB9A8"
+  },
+  "age_seconds": {"fresh_until": 0.35, "afterglow_until": 1.4, "memory_until": 5.0, "residue_until": 8.0},
+  "ghost_max_seconds": 1.25,
+  "stroke_px_at_reference_zoom": {"fresh": 2.3, "afterglow": 1.7, "memory": 1.3, "residue": 1.0, "player": 2.8, "ui_outline": 1.5},
+  "min_hit_target_px": 44
+}

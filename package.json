@@ -1,0 +1,11 @@
+{
+  "name": "echo",
+  "private": true,
+  "scripts": {
+    "test:solver": "node spike/stage06/tests.js",
+    "test:stage07": "node tests/js/stage07.test.js",
+    "check:firewall": "node tools/check_firewall.js",
+    "check:level": "node tools/map_validator/validate.js",
+    "check": "npm run test:solver && npm run test:stage07 && npm run check:firewall && npm run check:level"
+  }
+}
