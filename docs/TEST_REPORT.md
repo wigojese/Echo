@@ -1,29 +1,26 @@
 # Test report
 
-Updated 2026-11-22. Host: v22.23.5, Intel(R) Xeon(R) Processor @ 2.10GHz, linux/x64. Godot: **not installed, GDScript never executed**.
+Updated 2026-11-22. Host: v22.23.5, Intel(R) Xeon(R) Processor @ 2.10GHz, linux/x64. Godot: **not installed, GDScript never executed**. No phone was used.
 
 ## Status labels
 
 | Item | Label |
 |---|---|
-| Acoustic solver reference (Node), 13 tests | IMPLEMENTED/TESTED |
-| Reference simulation (Node), 31 tests | IMPLEMENTED/TESTED |
-| Level validator, firewall scanner, style tokens (17 checks) | IMPLEMENTED/TESTED |
-| Two scripted replays reproduce their live runs exactly | IMPLEMENTED/TESTED |
-| GDScript syntax, 18 files, gdtoolkit 4.5.0 | IMPLEMENTED/TESTED, **syntax only**, a Godot 4.7 parser may differ |
-| GDScript unit tests in `tests/run_tests.gd` including both replays | **BLOCKED/UNVERIFIED**, written, never run |
-| Playable Godot build, boot scene, clean-clone boot | **BLOCKED/UNVERIFIED** |
-| Browser graybox played by a person | **UNVERIFIED**, only driven by script |
-| Phone performance, frame pacing, thermals | **BLOCKED/UNVERIFIED**, no device |
-| `project.godot` 4.7 feature string, GitHub Actions workflow | **UNVERIFIED** |
+| Acoustic solver reference, 13 tests | IMPLEMENTED/TESTED |
+| Reference simulation, 31 tests | IMPLEMENTED/TESTED |
+| Input router, planner and control modes, 30 tests | IMPLEMENTED/TESTED |
+| Level validator, firewall scanner, style tokens, 17 checks | IMPLEMENTED/TESTED |
+| Emulated touch audit and input timing (headless Chromium) | EMULATED, not a phone |
+| GDScript syntax, 20 files, gdtoolkit 4.5.0 | IMPLEMENTED/TESTED, **syntax only** |
+| GDScript unit tests in `tests/run_tests.gd`, including router, planner and both replays | **BLOCKED/UNVERIFIED**, never run |
+| Finger comfort, one-hand reach, accidental-ping rate on a phone | **BLOCKED/UNVERIFIED**, no device. Script: `docs/COMFORT_TEST.md` |
+| Phone performance, frame pacing, thermals | **BLOCKED/UNVERIFIED** |
 
-Manual test to close the gaps, on a machine with Godot 4.7:
+Manual test to close the Godot gap, on a machine with Godot 4.7:
 
 ```bash
 godot --headless --path . -s tests/run_tests.gd
 ```
-
-Expected: all checks PASS, and replay A ends CAPTURED at tick 701 while replay B ends WON.
 
 ## Captured output
 
@@ -42,8 +39,8 @@ PASS  determinism: two runs give bit-identical cost fields
 PASS  hearing: ping at the fork is heard by the listener  cost=7.93 m, arrives 0.88 s after cast
 PASS  hearing: ping at spawn is not heard  cost=Infinity
 PASS  origin: field is rooted at the cast position (cost 0 there, 3.5 m to where the player went)  cost to later position=3.50
-BENCH L01 at 0.25 m cells: p50=0.630 ms  p95=1.110 ms  max=2.027 ms  (n=300, cells=13824)
-BENCH L01 at 0.20 m cells: p50=1.043 ms  p95=1.687 ms  max=6.803 ms  (n=300, cells=21600)
+BENCH L01 at 0.25 m cells: p50=0.570 ms  p95=0.854 ms  max=1.024 ms  (n=300, cells=13824)
+BENCH L01 at 0.20 m cells: p50=0.961 ms  p95=1.335 ms  max=1.747 ms  (n=300, cells=21600)
 
 HOST node v22.23.5, Intel(R) Xeon(R) Processor @ 2.10GHz, 4 logical CPUs, linux/x64
 RESULT 13 passed, 0 failed
@@ -58,7 +55,7 @@ PASS  validator rejects an exit inside a wall  Exit (8,3) is inside a wall.
 PASS  validator rejects a sealed exit  Exit (20,32) is sealed: no connected walkable route from spawn.
 PASS  validator rejects a spawn inside a wall  Spawn (8,3) is inside a wall or lacks 0.28 m clearance.
 PASS  validator rejects corridors narrower than 0.65 m  Corridor width 0.60 m is below the 0.65 m minimum.
-PASS  firewall passes on the real repository  FIREWALL scanned 2 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
+PASS  firewall passes on the real repository  FIREWALL scanned 4 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
 PASS  firewall catches a camera script that reads WorldTruth and predators  exit=1
 PASS  tokens: no blue, teal or cyan hue in the palette
 PASS  tokens: paper_chalk has at least 4.5:1 text contrast on plate black  14.8:1
@@ -87,7 +84,7 @@ PASS  10 one ping from spawn does not reveal the exit
 PASS  11 static memory fully expires within 8 s of the last contact
 PASS  12 a creature is remembered only as a ghost that is gone within 1.25 s
 PASS  12b the ghost stays where the creature was, never at its current position
-PASS  13 the snapshot exposes no predator field  tick,player,segments,castOrigins,ghosts,knownExit
+PASS  13 the snapshot exposes no predator field  tick,player,segments,cells,grid,castOrigins,ghosts,knownExit
 PASS  14 a ping at the fork is heard at the computed weighted cost and delay  cost=8.786, delay=30 ticks
 PASS  15 a ping at spawn is never heard
 PASS  16 moving after the ping: the listener goes to the old origin, not to the player  player is 5.2 m from the origin
@@ -107,15 +104,59 @@ PASS  28 one scripted run is caught and the other wins on the same level  CAPTUR
 RESULT 31 passed, 0 failed
 ```
 
+### `node tests/js/stage09.test.js`
+```
+PASS  R1 tapping Echo sends one ping and never a waypoint
+PASS  R2 tapping the world sends one waypoint and never a ping
+PASS  R3 a drag that starts in the world and ends on Echo does not ping
+PASS  R4 a press on Echo that slides away pings once and sets no waypoint
+PASS  R5 a long press in the world (400 ms) sets no waypoint
+PASS  R6 a drag of 20 px sets no waypoint
+PASS  R7 two fingers in the world are a pinch and set no waypoint
+PASS  R8 joystick mode: thumb steering and Echo work together with two fingers  joystick,joystick,ping
+PASS  R9 an interruption (pointer cancel) cancels everything and never pings
+PASS  R10 a third finger is ignored: nothing needs three
+PASS  R11 left-handed layout mirrors Echo to the left and frees the right side
+PASS  R11b left-handed joystick mode puts the stick zone on the right
+PASS  R12 every control hit area is at least 44 by 44  echo 104, quiet 118x46, pause 60
+PASS  R13 holding Quiet step toggles it once, not repeatedly
+PASS  R14 the input log never stores a screen coordinate
+PASS  R15 switching control mode cancels any gesture in progress
+PASS  S1 spamming Echo for 3.3 s: casts are at least 38 ticks apart and refusals are logged  casts at 0,40,80, refused 8
+PASS  S1b no cast is delayed or queued: nothing sounds after the last tap
+PASS  S2 a ping while walking starts exactly where you were when you tapped  origin y=5.16
+PASS  S3 tapping unlit floor stops at the edge of what you know and never walks into the dark  final y=5.35, plan truncated=true
+PASS  S4 after an echo lights the corridor, tapping it walks you there and stops  final=(3.11,9.10)
+PASS  S5 every cell on the route is known and walkable
+PASS  S6 tapping inside a wall routes only through known floor, never through the wall
+PASS  S7 tapping Echo while walking to a waypoint pings and keeps walking  moved 2.33 m after the ping
+PASS  S8a joystick mode finishes EC-L01 with at most two fingers, first echo inside 5 s  won at tick 750 (25.0 s), pointers<=2
+PASS  S8b tap-to-waypoint mode finishes EC-L01 with one finger at a time  won at tick 945 (31.5 s), 4 echoes, 4 waypoint taps, pointers<=1
+PASS  S9 an interruption mid-press pauses safely, resumes without a duplicate or late cast  casts=1
+PASS  S10 the same touches give the same simulation inputs and the same world
+PASS  S11 cancelling mid-route stops you within half a metre of where you were, and you stay stopped  stopped at y=4.49
+PASS  S12 you can move at the very start, inside the opening-breath chamber, before any echo  y=5.09
+RESULT 30 passed, 0 failed
+```
+
 ### `node tools/check_firewall.js`
 ```
-FIREWALL scanned 2 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
+FIREWALL scanned 4 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
 FIREWALL OK: no view-layer script references ground truth
 ```
 
 ### `node tools/map_validator/validate.js`
 ```
 LEVEL OK: EC-L01
+```
+
+### `cat reference/evidence/input-audit.txt`
+```
+AUDIT emulated touch, headless Chromium 157.0.8103.78, 390x844 CSS px, dsf 2. Not a phone.
+MODE waypoint: A deliberate Echo taps pinged 50/50 | B world-to-Echo drags pinged 0/50 (want 0) | C stray taps near Echo pinged 0/50 (want 0) | D interrupted presses pinged 0/20 (want 0) | E two fingers: n/a
+MODE joystick: A deliberate Echo taps pinged 50/50 | B world-to-Echo drags pinged 0/50 (want 0) | C stray taps near Echo pinged 0/50 (want 0) | D interrupted presses pinged 0/20 (want 0) | E two fingers: moved 0.70 m while 1 echo(es) sent
+LATENCY touch-down on Echo to the render frame that includes the cast: n=100 p50=30.7 ms p95=47.4 ms max=49.0 ms (headless, event dispatch to rAF callback)
+FRAMES headless rAF interval: p50=16.7 ms p95=16.7 ms p99=16.8 ms (software rendering, server CPU)
 ```
 
 ### `cat reference/replays/A_heard_and_caught.log.txt`
@@ -159,6 +200,8 @@ parsed ok  game/scripts/core/semantic_events.gd
 parsed ok  game/scripts/core/sim_clock.gd
 parsed ok  game/scripts/core/simulation.gd
 parsed ok  game/scripts/core/world_truth.gd
+parsed ok  game/scripts/input/input_driver.gd
+parsed ok  game/scripts/input/input_router.gd
 parsed ok  game/scripts/knowledge/knowledge_gate.gd
 parsed ok  game/scripts/knowledge/knowledge_store.gd
 parsed ok  game/scripts/knowledge/visible_world_snapshot.gd

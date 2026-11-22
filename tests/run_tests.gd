@@ -181,3 +181,61 @@ func test_sim_camera_independent_of_hidden_predator() -> void:
         if director.frame(a.snapshot()) != director.frame(b.snapshot()) or a.snapshot().memory_segments != b.snapshot().memory_segments:
             same = false
     _check("sim camera firewall: different hidden predator positions, identical framing for 300 ticks", same)
+
+
+# ---- Stage 09: input router and planner, mirrors tests/js/stage09.test.js. Never run in Godot yet. ----
+
+func _kinds(r: InputRouter) -> Array:
+    var names: Array = []
+    for i in r.drain():
+        names.append(String(i["type"]))
+    return names
+
+
+func test_input_echo_tap_pings_only() -> void:
+    var r := InputRouter.new()
+    r.pointer_down(1, Vector2(318, 740), 0.0)
+    r.pointer_up(1, Vector2(318, 740), 60.0)
+    _check("input: tapping Echo sends one ping and no waypoint", _kinds(r) == ["ping"])
+
+
+func test_input_world_to_echo_drag_never_pings() -> void:
+    var r := InputRouter.new()
+    r.pointer_down(1, Vector2(150, 300), 0.0)
+    r.pointer_move(1, Vector2(318, 740))
+    r.pointer_up(1, Vector2(318, 740), 90.0)
+    _check("input: a drag that starts in the world and ends on Echo does not ping", _kinds(r).is_empty())
+
+
+func test_input_third_finger_and_cancel() -> void:
+    var r := InputRouter.new()
+    r.set_mode(&"joystick")
+    r.pointer_down(1, Vector2(80, 600), 0.0)
+    r.pointer_down(2, Vector2(318, 740), 10.0)
+    r.drain()
+    r.pointer_down(3, Vector2(150, 400), 20.0)
+    _check("input: a third finger is ignored", r.owners.size() == 2 and _kinds(r).is_empty())
+    r.pointer_cancel(2)
+    _check("input: an interruption cancels everything and never pings", _kinds(r) == ["cancel_all"])
+
+
+func test_input_long_press_is_not_a_waypoint() -> void:
+    var r := InputRouter.new()
+    r.pointer_down(1, Vector2(150, 300), 0.0)
+    r.pointer_up(1, Vector2(150, 300), 400.0)
+    _check("input: a 400 ms press in the world sets no waypoint", _kinds(r).is_empty())
+
+
+func test_input_planner_truncates_at_known_boundary() -> void:
+    var sim := _l01()
+    var snap := sim.snapshot()
+    var far := InputDriver.screen_to_world(Vector2(195, 120), snap.player_position)
+    var result := InputDriver.plan(snap, far)
+    var known: Dictionary = {}
+    for c in snap.known_cells:
+        known[int(c[0])] = true
+    var inside := true
+    for c in result["cells"]:
+        if not known.has(c):
+            inside = false
+    _check("input: tapping unlit floor routes only through known cells and is marked truncated", result["truncated"] and inside)

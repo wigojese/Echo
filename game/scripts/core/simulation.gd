@@ -68,6 +68,15 @@ func reset(first: bool = false) -> void:
             agent.waypoints.append(Vector2(w[0], w[1]))
         agent.hearing_limit = float(p.get("hearing_cost_limit_m", AcousticFieldSolver.HEARING_LIMIT))
         predators.append(agent)
+    var opening: float = float(level["rules"].get("opening_breath_m", 0.0))
+    if opening > 0.0:
+        var f := AcousticFieldSolver.solve(grid, motion.position, opening)
+        for e in edges:
+            if not is_inf(f[e["cell"]]):
+                knowledge.record_contact(e["id"], e["a"], e["b"], 0, 0)
+        for c in range(f.size()):
+            if not is_inf(f[c]):
+                knowledge.record_cell(c, 0)
     if not first:
         bus.emit_event(SemanticEvents.LEVEL_RESET, 0, {})
 
@@ -123,7 +132,7 @@ static func group_replay(replay: Dictionary) -> Dictionary:
 
 
 func snapshot() -> VisibleWorldSnapshot:
-    return KnowledgeGate.build(motion.position, knowledge, _exit_pos, tick)
+    return KnowledgeGate.build(motion.position, knowledge, _exit_pos, tick, {"nx": grid.nx, "ny": grid.ny, "cell": grid.cell})
 
 
 func _schedule(at: int, fn: Callable) -> void:
@@ -165,6 +174,12 @@ func _ping(t: int) -> void:
         var a: Vector2 = e["a"]
         var b: Vector2 = e["b"]
         _schedule(at, func() -> void: knowledge.record_contact(id, a, b, at, cast_id))
+    for c in range(field.size()):
+        if is_inf(field[c]):
+            continue
+        var cell_at := t + ceili(field[c] / AcousticFieldSolver.PULSE_SPEED / SimClock.DT)
+        var cell_id := c
+        _schedule(cell_at, func() -> void: knowledge.record_cell(cell_id, cell_at))
     bus.emit_event(
         SemanticEvents.PING_CAST,
         t,

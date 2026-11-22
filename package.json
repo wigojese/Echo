@@ -6,9 +6,12 @@
     "test:stage07": "node tests/js/stage07.test.js",
     "check:firewall": "node tools/check_firewall.js",
     "check:level": "node tools/map_validator/validate.js",
-    "check": "npm run test:solver && npm run test:stage07 && npm run test:stage08 && npm run check:firewall && npm run check:level",
+    "check": "npm run test:solver && npm run test:stage07 && npm run test:stage08 && npm run test:stage09 && npm run check:firewall && npm run check:level",
     "test:stage08": "node tests/js/stage08.test.js",
     "replays": "node tools/replay_viewer/make_replays.js",
-    "evidence": "node tools/replay_viewer/shots.js"
+    "evidence": "node tools/replay_viewer/shots.js",
+    "test:stage09": "node tests/js/stage09.test.js",
+    "audit:input": "node tools/input_latency/measure.js",
+    "evidence:input": "node tools/input_latency/shots.js"
   }
 }

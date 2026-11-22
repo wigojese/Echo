@@ -2,9 +2,26 @@
   "schema_version": 1,
   "id": "EC-L01",
   "seed": 2083,
-  "world_bounds_metres": [0, 0, 24, 36],
-  "player": {"spawn_xy": [3, 3], "collision_radius_m": 0.28},
-  "goal": {"exit_xy": [20, 32], "trigger_radius_m": 0.8},
+  "world_bounds_metres": [
+    0,
+    0,
+    24,
+    36
+  ],
+  "player": {
+    "spawn_xy": [
+      3,
+      3
+    ],
+    "collision_radius_m": 0.28
+  },
+  "goal": {
+    "exit_xy": [
+      20,
+      32
+    ],
+    "trigger_radius_m": 0.8
+  },
   "rules": {
     "dt_hz": 30,
     "ping_cooldown_s": 1.25,
@@ -12,13 +29,39 @@
     "pulse_max_weighted_cost_m": 13.5,
     "memory_duration_s": 8.0,
     "level_soft_timeout_s": 90,
-    "acoustic_cell_m": 0.25
+    "acoustic_cell_m": 0.25,
+    "opening_breath_m": 3.0
   },
   "geometry_file": "res://game/resources/levels/EC-L01-geometry.json",
   "predators": [
-    {"id": "listener-01", "type": "LISTENER", "spawn_xy": [13, 24],
-     "patrol_waypoints": [[13, 24], [17, 24], [13, 24]], "hearing_cost_limit_m": 11.0}
+    {
+      "id": "listener-01",
+      "type": "LISTENER",
+      "spawn_xy": [
+        13,
+        24
+      ],
+      "patrol_waypoints": [
+        [
+          13,
+          24
+        ],
+        [
+          17,
+          24
+        ],
+        [
+          13,
+          24
+        ]
+      ],
+      "hearing_cost_limit_m": 11.0
+    }
   ],
   "art_pack_id": "plate-d-01",
-  "tutorial_keys": ["ping_intro", "echo_heard", "move_into_memory"]
+  "tutorial_keys": [
+    "ping_intro",
+    "echo_heard",
+    "move_into_memory"
+  ]
 }

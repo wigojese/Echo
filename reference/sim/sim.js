@@ -51,11 +51,18 @@ class Sim {
     this.pos = [...L.player.spawn_xy]; this.vel = [0, 0]; this.dir = [0, 0]; this.quiet = false;
     this.nextPingTick = 0; this.castCount = 0; this.pathLen = 0; this.exitTicks = 0;
     this.events = []; this.scheduled = new Map(); this.casts = [];
-    this.mem = new Map(); this.ghosts = new Map(); this.castOrigins = []; this.exitKnown = false;
+    this.mem = new Map(); this.cellMem = new Map(); this.ghosts = new Map(); this.castOrigins = []; this.exitKnown = false;
     this.lastField = null;
     this.pred = (L.predators || []).map((p) => ({ id: p.id, pos: [...p.spawn_xy], wp: p.patrol_waypoints, wpIdx: 1, state: 'PATROL',
       dest: null, lastHeardOrigin: null, lastHeardTick: -1, lastSeenPlayerTick: -1, investigationCount: 0, heardCastIds: [],
       curiousStart: -1, searchStart: -1, contactTicks: 0, alertStart: -1, lostTicks: 0, capTicks: 0, lastSeenPos: null, hearingLimit: p.hearing_cost_limit_m || P.hearingLimit }));
+    // Opening breath: the starting chamber is known from tick 0 without any noise or event.
+    const ob = (L.rules && L.rules.opening_breath_m) || 0;
+    if (ob > 0) {
+      const f = S.field(this.grid, L.player.spawn_xy[0], L.player.spawn_xy[1], ob);
+      for (const e of this.edges) if (f[e.cell] !== Infinity) this.mem.set(e.id, { tick: 0, castId: 0 });
+      for (let c = 0; c < f.length; c++) if (f[c] !== Infinity) this.cellMem.set(c, 0);
+    }
     if (!first) this.emit('level_reset', {});
   }
 
@@ -114,6 +121,7 @@ class Sim {
     for (const e of this.edges) { const c = field[e.cell]; if (c === Infinity) continue;
       const at = t + Math.ceil(c / S.PULSE_SPEED / DT); count++; first = Math.min(first, at); last = Math.max(last, at);
       this.schedule(at, () => this.mem.set(e.id, { tick: at, castId })); }
+    for (let c = 0; c < field.length; c++) { if (field[c] === Infinity) continue; const at = t + Math.ceil(field[c] / S.PULSE_SPEED / DT); this.schedule(at, () => this.cellMem.set(c, at)); }
     this.emit('ping_cast', { castId, origin, edges: count, cooldownUntil: this.nextPingTick });
     if (count) this.schedule(first, () => this.emit('wave_contact', { castId, edges: count, firstTick: first, lastTick: last }));
     // exit becomes known only if the wave really reaches it
@@ -139,6 +147,7 @@ class Sim {
 
   updateKnowledge(t) {
     for (const [id, m] of this.mem) if (t - m.tick > P.memoryTicks) this.mem.delete(id);
+    for (const [c, k] of this.cellMem) if (t - k > P.memoryTicks) this.cellMem.delete(c);
     for (const [id, g] of this.ghosts) if (t - g.tick > P.ghostTicks) this.ghosts.delete(id);
     this.castOrigins = this.castOrigins.filter((c) => t - c.tick <= P.castOriginTicks);
   }
@@ -193,7 +202,8 @@ class Sim {
     const t = this.tick, segs = [];
     for (const [id, m] of this.mem) if (t - m.tick <= P.memoryTicks) segs.push({ id, ageTicks: t - m.tick, castId: m.castId });
     segs.sort((a, b) => a.id - b.id);
-    return { tick: t, player: [...this.pos], segments: segs,
+    const cells = []; for (const [c, k] of this.cellMem) if (t - k <= P.memoryTicks) cells.push([c, t - k]); cells.sort((a, b) => a[0] - b[0]);
+    return { tick: t, player: [...this.pos], segments: segs, cells, grid: { nx: this.grid.nx, ny: this.grid.ny, cell: this.grid.cell },
       castOrigins: this.castOrigins.map((c) => ({ castId: c.castId, origin: [...c.origin], ageTicks: t - c.tick })),
       ghosts: [...this.ghosts.values()].map((g) => ({ pos: [...g.pos], ageTicks: t - g.tick })),
       knownExit: this.exitKnown ? [...this.level.goal.exit_xy] : null };

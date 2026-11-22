@@ -31,7 +31,7 @@ const noPred = (l) => { const c = clone(l); c.predators = []; return c; };
   check('06 cooldown: tap at 5 is rejected visibly, tap at 38 (1.27 s) is accepted', kinds(s, 'ping_cast').length === 2 && kinds(s, 'ping_rejected').length === 1 && kinds(s, 'ping_rejected')[0].tick === 5); }
 { const s = new Sim(noPred(L01), G01); run(s, 31, { 0: [{ type: 'ping' }], 1: [{ type: 'move', dx: 0, dy: 1 }] });
   check('07 a ping starts at the cast position, not where the player is later', kinds(s, 'ping_cast')[0].payload.origin[1] === 3 && s.pos[1] > 4, `origin y=3, player y now=${s.pos[1].toFixed(2)}`); }
-{ const s = new Sim(noPred(L01), G01), f = []; s.step([{ type: 'ping' }]); const F = s.lastField.field; let early = 0, exact = true;
+{ const l08 = noPred(L01); l08.rules.opening_breath_m = 0; const s = new Sim(l08, G01), f = []; s.step([{ type: 'ping' }]); const F = s.lastField.field; let early = 0, exact = true;
   for (let k = 1; k < 90; k++) { s.step(); const want = new Set(s.edges.filter((e) => F[e.cell] !== Infinity && Math.ceil(F[e.cell] / S.PULSE_SPEED * 30) <= s.tick - 1).map((e) => e.id)); for (const id of s.mem.keys()) if (!want.has(id)) early++; if (want.size !== s.mem.size) exact = false; }
   check('08 no wall face is known before the front reaches it, and every reached face is known on time', early === 0 && exact, `early=${early}`); }
 // 9-10 sealed wall and exit
@@ -50,7 +50,7 @@ const noPred = (l) => { const c = clone(l); c.predators = []; return c; };
   check('12b the ghost stays where the creature was, never at its current position', notLive); }
 { const s = new Sim(L01, G01), by = new Map(); RA.inputs.forEach((i) => by.set(i.tick, [...(by.get(i.tick) || []), i])); const keys = new Set();
   for (let k = 0; k < 700; k++) { s.step(by.get(s.tick) || []); Object.keys(s.snapshot()).forEach((x) => keys.add(x)); }
-  check('13 the snapshot exposes no predator field', [...keys].sort().join() === ['castOrigins', 'ghosts', 'knownExit', 'player', 'segments', 'tick'].sort().join(), [...keys].join()); }
+  check('13 the snapshot exposes no predator field', [...keys].sort().join() === ['castOrigins', 'cells', 'ghosts', 'grid', 'knownExit', 'player', 'segments', 'tick'].sort().join(), [...keys].join()); }
 // 14-18 predator
 { const s = runReplay(L01, G01, RA), c = kinds(s, 'ping_cast')[0], h = kinds(s, 'heard_ping')[0];
   check('14 a ping at the fork is heard at the computed weighted cost and delay', h && h.payload.weightedCost <= 11 && h.tick === c.tick + Math.ceil(h.payload.weightedCost / 9 * 30), `cost=${h && h.payload.weightedCost}, delay=${h && h.tick - c.tick} ticks`); }
@@ -68,7 +68,7 @@ const noPred = (l) => { const c = clone(l); c.predators = []; return c; };
   const w = kinds(s, 'exit_reached')[0]; check('19 winning needs 0.15 s inside the 0.8 m exit zone', s.state === 'WON' && w && w.tick - first >= 4, `entered at ${first}, won at ${w && w.tick}`); }
 // 20-21 retry and determinism
 { const s = runReplay(L01, G01, RA); const end = JSON.stringify(s.events); s.reset(); const f = new Sim(L01, G01);
-  const same = s.tick === 0 && s.state === 'RUNNING' && s.mem.size === 0 && s.ghosts.size === 0 && s.castOrigins.length === 0 && s.scheduled.size === 0 && s.nextPingTick === 0 && s.castCount === 0 && s.pathLen === 0 &&
+  const same = s.tick === 0 && s.state === 'RUNNING' && s.mem.size === f.mem.size && s.cellMem.size === f.cellMem.size && s.ghosts.size === 0 && s.castOrigins.length === 0 && s.scheduled.size === 0 && s.nextPingTick === 0 && s.castCount === 0 && s.pathLen === 0 &&
     JSON.stringify(s.pred) === JSON.stringify(f.pred) && JSON.stringify(s.snapshot()) === JSON.stringify(f.snapshot()) && s.events.length === 1 && s.events[0].kind === 'level_reset';
   check('20 instant retry resets memory, ghosts, queued events, cooldown, AI and counters', same);
   const by = new Map(); RA.inputs.forEach((i) => by.set(i.tick, [...(by.get(i.tick) || []), i])); while (s.state === 'RUNNING') s.step(by.get(s.tick) || []);

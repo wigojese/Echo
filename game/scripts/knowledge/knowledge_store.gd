@@ -11,6 +11,7 @@ const CAST_ORIGIN_TICKS := 240
 var segments: Dictionary = {}  # segment_id -> {a, b, contact_tick, cast_id}
 var ghosts: Dictionary = {}  # entity_id -> {position, seen_tick, direct}
 var cast_origins: Array[Dictionary] = []  # {origin, tick, cast_id}
+var cells: Dictionary = {}  # cell id -> contact tick, known open floor
 var exit_known: bool = false
 
 
@@ -26,6 +27,10 @@ func record_sighting(entity_id: StringName, position: Vector2, tick: int, direct
     ghosts[entity_id] = {"position": position, "seen_tick": tick, "direct": direct}
 
 
+func record_cell(cell_id: int, tick: int) -> void:
+    cells[cell_id] = tick
+
+
 func mark_exit_known() -> void:
     exit_known = true
 
@@ -34,6 +39,9 @@ func prune(tick: int) -> void:
     for id in segments.keys():
         if tick - int(segments[id]["contact_tick"]) > MEMORY_TICKS:
             segments.erase(id)
+    for id in cells.keys():
+        if tick - int(cells[id]) > MEMORY_TICKS:
+            cells.erase(id)
     for id in ghosts.keys():
         if tick - int(ghosts[id]["seen_tick"]) > GHOST_TICKS:
             ghosts.erase(id)
@@ -43,5 +51,6 @@ func prune(tick: int) -> void:
 func reset() -> void:
     segments.clear()
     ghosts.clear()
+    cells.clear()
     cast_origins.clear()
     exit_known = false

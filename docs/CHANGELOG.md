@@ -13,3 +13,10 @@
 - Stage 08 graybox: reference simulation (31 tests), browser graybox, two replays, evidence images, GDScript port (parse-checked only).
 - Adjusted one test threshold (tick 560 to 600) because the player had not yet walked 3 m, not because the simulation was wrong.
 - Added events `ping_rejected` and `level_timeout`.
+
+- Stage 08 approved.
+- Stage 09: input router and driver (30 checks), both control modes in the graybox, emulated touch audit, GDScript port, input spec and comfort test script.
+- Added the opening breath (3.0 m known at spawn) and known-floor cells to the snapshot.
+- Test changes caused by new features or test mistakes, not by sim changes: stage 08 test 20 now compares memory with a fresh start instead of expecting zero, and test 08 uses a level without the opening breath; stage 09 tap points, bot release timing and two loose assertions were corrected.
+- Found by test and fixed: waypoint routes jammed at inner corners until body clearance and a stuck guard were added.
+- Left-handed layout keeps Pause at the top right.
