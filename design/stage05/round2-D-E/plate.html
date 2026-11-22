@@ -1,0 +1,381 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>ECHO D The Listening Plate</title>
+<style>
+:root{--black:#0B0D0B;--sub:#151A16;--chalk:#E6E0D2;--fresh:#CDE9BB;--glow:#9FC19B;--mem:#718B70;--res:#4E624F;--amber:#F4BE70;--danger:#E98158;--exit:#F1D17C;--ui:#AEB9A8}
+*{box-sizing:border-box}
+body{margin:0;background:#050605;font-family:Inter,sans-serif;color:var(--chalk)}
+.sheet{padding:44px 50px 54px;background:#050605;display:inline-block;min-width:1000px}
+.sheet h2{font:600 26px/1.2 Inter;margin:0 0 6px;letter-spacing:-.01em}
+.sheet .sub{margin:0 0 28px;font:400 15px/1.55 Inter;color:#9aa595;max-width:1000px}
+.phones{display:flex;gap:34px;align-items:flex-start}
+.col{display:flex;flex-direction:column}
+.phone{border-radius:30px;overflow:hidden;position:relative;border:1px solid #232b24;flex:none}
+.phone.gray{filter:grayscale(1)}
+.phone svg{display:block}
+.cap{font:500 13.5px/1.45 Inter;color:#b3bfae;margin-top:11px}
+.cap b{color:#E6E0D2;font-weight:600}
+.cap span{color:#7d8979;font-weight:400}
+.legend{margin-top:12px;font:400 13px/1.55 Inter;color:#aab5a6}
+.legend i{font-style:normal;display:inline-block;width:17px;height:17px;border:1.2px solid #E6E0D2;border-radius:50%;text-align:center;font:600 11px/15px Inter;margin-right:7px;color:#E6E0D2}
+.legend div{margin-bottom:4px}
+table{border-collapse:collapse;font:400 14px/1.4 Inter}
+td,th{padding:8px 14px 8px 0;text-align:left;border-bottom:1px solid #1d241e;vertical-align:middle}
+th{font-weight:600;color:#9aa595;font-size:13px}
+.sw{width:34px;height:22px;border-radius:4px;border:1px solid #2c352d;display:inline-block}
+.grid{display:grid;gap:34px}
+.panel{background:#0B0D0B;border:1px solid #232b24;border-radius:14px;padding:22px}
+.panel h3{font:600 16px Inter;margin:0 0 12px}
+.panel p{font:400 14px/1.5 Inter;color:#aab5a6;margin:0 0 10px}
+</style></head><body><div id="root"></div>
+<script>
+// ===================== world engine (same solver for every frame) =====================
+const S=0.2,NX=120,NY=180;
+let walk,edges,wd;
+const L01=[[3,3,3,10],[3,10,11,10],[11,10,11,17],[11,17,19,17],[19,17,19,26],[19,26,20,32],[11,17,5,17],[5,17,5,19],[11,17,11,24],[11,24,19,24],[11,24,11,29],[19,17,22,17]];
+const TEST=[[4,6,4,14],[7.2,6,7.2,14]]; // two sealed parallel corridors, wall 0.4 m... widened below
+function dseg(px,py,a,b,c,d){const dx=c-a,dy=d-b,l=dx*dx+dy*dy;let t=l?((px-a)*dx+(py-b)*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-(a+t*dx),py-(b+t*dy));}
+function setWorld(strips,half=1.2){
+ walk=new Uint8Array(NX*NY);
+ for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){const x=(i+.5)*S,y=(j+.5)*S;for(const s of strips){if(dseg(x,y,...s)<=half){walk[j*NX+i]=1;break;}}}
+ const W=(i,j)=>i>=0&&j>=0&&i<NX&&j<NY&&walk[j*NX+i];
+ edges=[];
+ for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){if(!walk[j*NX+i])continue;const x0=i*S,y0=j*S,x1=x0+S,y1=y0+S,c=j*NX+i;
+  if(!W(i-1,j))edges.push({x1:x0,y1:y0,x2:x0,y2:y1,nx:-1,ny:0,c});
+  if(!W(i+1,j))edges.push({x1:x1,y1:y0,x2:x1,y2:y1,nx:1,ny:0,c});
+  if(!W(i,j-1))edges.push({x1:x0,y1:y0,x2:x1,y2:y0,nx:0,ny:-1,c});
+  if(!W(i,j+1))edges.push({x1:x0,y1:y1,x2:x1,y2:y1,nx:0,ny:1,c});}
+ // chamfer distance to nearest wall
+ wd=new Float32Array(NX*NY);for(let k=0;k<NX*NY;k++)wd[k]=walk[k]?1e9:0;
+ const g=(i,j)=>(i<0||j<0||i>=NX||j>=NY)?0:wd[j*NX+i];
+ for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){const k=j*NX+i;if(!walk[k])continue;wd[k]=Math.min(wd[k],g(i-1,j)+1,g(i,j-1)+1,g(i-1,j-1)+1.414,g(i+1,j-1)+1.414);}
+ for(let j=NY-1;j>=0;j--)for(let i=NX-1;i>=0;i--){const k=j*NX+i;if(!walk[k])continue;wd[k]=Math.min(wd[k],g(i+1,j)+1,g(i,j+1)+1,g(i+1,j+1)+1.414,g(i-1,j+1)+1.414);}
+ for(let k=0;k<NX*NY;k++)wd[k]*=S;
+}
+function field(ox,oy,maxc=13.5){const W=(i,j)=>i>=0&&j>=0&&i<NX&&j<NY&&walk[j*NX+i];
+ const cost=new Float64Array(NX*NY).fill(Infinity);const h=[];
+ const push=(c,k)=>{h.push([c,k]);let n=h.length-1;while(n>0){const p=(n-1)>>1;if(h[p][0]<=h[n][0])break;[h[p],h[n]]=[h[n],h[p]];n=p;}};
+ const pop=()=>{const t=h[0],l=h.pop();if(h.length){h[0]=l;let n=0;for(;;){let a=2*n+1,b=a+1,m=n;if(a<h.length&&h[a][0]<h[m][0])m=a;if(b<h.length&&h[b][0]<h[m][0])m=b;if(m===n)break;[h[m],h[n]]=[h[n],h[m]];n=m;}}return t;};
+ const s=Math.floor(oy/S)*NX+Math.floor(ox/S);cost[s]=0;push(0,s);
+ while(h.length){const [c,k]=pop();if(c>cost[k])continue;const i=k%NX,j=(k/NX)|0;
+  for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){if(!di&&!dj)continue;const a=i+di,b=j+dj;if(!W(a,b))continue;
+   if(di&&dj&&(!W(i+di,j)||!W(i,j+dj)))continue;const nc=c+S*(di&&dj?1.4142:1);if(nc>maxc)continue;const nk=b*NX+a;if(nc<cost[nk]){cost[nk]=nc;push(nc,nk);}}}
+ return cost;}
+const cellOf=(x,y)=>Math.floor(y/S)*NX+Math.floor(x/S);
+const en=c=>.55+.45*Math.max(0,1-c/13.5);
+const hx=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const mix=(a,b,t)=>{t=Math.max(0,Math.min(1,t));const A=hx(a),B=hx(b);return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join('');};
+const f1=n=>n.toFixed(1);
+const T={black:'#0B0D0B',sub:'#151A16',chalk:'#E6E0D2',fresh:'#CDE9BB',glow:'#9FC19B',mem:'#718B70',res:'#4E624F',amber:'#F4BE70',danger:'#E98158',exit:'#F1D17C',ui:'#AEB9A8'};
+const hash=(a,b)=>{let h=(a*73856093)^(b*19349663);h=(h^(h>>>13))*1274126177;return ((h^(h>>>16))>>>0)%1000/1000;};
+
+// ===================== view =====================
+const VP={full:{PW:390,PH:844,K:20,m:22,top:76,bot:34,r:44,pill:[118,46]},compact:{PW:320,PH:568,K:16.5,m:16,top:46,bot:14,r:38,pill:[92,44]}};
+let cam;
+const sx=x=>cam.PX+(x-cam.cx)*cam.K, sy=y=>cam.PY-(y-cam.cy)*cam.K;
+
+// ===================== marks =====================
+function listener(x,y,col=T.chalk,sc=1.35){return `<g transform="translate(${f1(x)} ${f1(y)}) scale(${sc})" fill="none" stroke-linecap="round" stroke-linejoin="round">
+ <g stroke="${T.black}" stroke-width="5.4"><path d="M-6 -13V-3Q-6 3 0 3Q6 3 6 -3V-6"/><path d="M6 -10.5V-9"/><path d="M0 3V12"/></g>
+ <g stroke="${col}" stroke-width="2.4"><path d="M-6 -13V-3Q-6 3 0 3Q6 3 6 -3V-6"/><path d="M6 -10.5V-9"/><path d="M0 3V12"/></g>
+ <circle cx="0" cy="14.5" r="1.3" fill="${col}" stroke="none"/></g>`;}
+function origin(x,y,kind,op=1){ // fixed world scar: punched notch ring
+ const col=kind==='heard'?T.amber:kind==='fresh'?T.fresh:T.mem;let t='';
+ for(let a=0;a<8;a++){const r=a*Math.PI/4;t+=`M${f1(Math.cos(r)*5.5)} ${f1(Math.sin(r)*5.5)}L${f1(Math.cos(r)*(a%2?8.5:11))} ${f1(Math.sin(r)*(a%2?8.5:11))}`;}
+ return `<g transform="translate(${f1(x)} ${f1(y)})" opacity="${op}" fill="none" stroke="${col}" stroke-linecap="round"><circle r="2.2" fill="${col}" stroke="none"/><path d="${t}" stroke-width="1.7"/>${kind==='heard'?`<circle r="17" stroke="${T.danger}" stroke-width="1.3" stroke-dasharray="3 4" opacity=".85"/><path d="M-22 -3L-17 0L-22 3M22 -3L17 0L22 3M-3 -22L0 -17L3 -22M-3 22L0 17L3 22" stroke="${T.amber}" stroke-width="2"/>`:''}</g>`;}
+function beast(x,y,mode,s=1){
+ const body=`<path d="M-14 8Q-12 -6 -2 -9Q7 -11 11 -4"/><path d="M11 -4L16 -8L19 -4L15 -1"/><path d="M-9 7L-12 16M-3 6L-4 17M5 3L8 14"/><path d="M-14 8L-19 5"/>`;
+ if(mode==='direct')return `<g transform="translate(${f1(x)} ${f1(y)}) scale(${s})" fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="${T.black}" stroke-width="6" opacity=".7">${body}</g><g stroke="${T.danger}" stroke-width="2.7" stroke-dasharray="11 3 5 3">${body}</g></g>`;
+ return `<g transform="translate(${f1(x)} ${f1(y)}) scale(${s})" fill="none" stroke="${T.amber}" stroke-width="2" stroke-linecap="round" stroke-dasharray="0.1 5.2" opacity=".72">${body}<circle r="24" stroke-width="1.2" stroke-dasharray="0.1 6"/></g>`;}
+function chip(x,y,t){return `<g><circle cx="${f1(x)}" cy="${f1(y)}" r="9.5" fill="${T.black}" stroke="${T.chalk}" stroke-width="1.2"/><text x="${f1(x)}" y="${f1(y+4)}" text-anchor="middle" font-size="11.5" font-weight="700" fill="${T.chalk}" font-family="Inter">${t}</text></g>`;}
+
+// ===================== solver-driven plate render =====================
+function drawPlate(sc){
+ const out={edges:'',seam:'',fill:''};
+ const fields=sc.pings.map(p=>field(p.o[0],p.o[1],p.maxc||13.5));sc.fields=fields;
+ const groups={};
+ const add=(k,col,w,op,dash,d)=>{const key=[k,col,w,op,dash].join('|');(groups[key]=groups[key]||{col,w,op,dash,d:[]}).d.push(d);};
+ for(const e of edges){let best=Infinity,bc=0;
+  sc.pings.forEach((p,k)=>{const c=fields[k][e.c];if(c===Infinity)return;const t=p.age-c/9;if(t>=0&&t<best){best=t;bc=c;}});
+  if(best===Infinity)continue;
+  const d=`M${f1(sx(e.x1))} ${f1(sy(e.y1))}L${f1(sx(e.x2))} ${f1(sy(e.y2))}`;
+  if(sc.print){add('p',T.glow,1.3,.9,'',d);continue;}
+  const t=best,E=en(bc);
+  if(t<.35)add('f',T.fresh,2.3,1,'',d);
+  else if(t<1.4){const u=(t-.35)/1.05;add('a',mix(T.fresh,T.glow,u),(1.9-.3*u).toFixed(2),(.95*E).toFixed(2),'',d);}
+  else if(t<8){const u=(t-1.4)/6.6;const keep=1-.92*Math.pow(u,1.15);
+   const mx=(e.x1+e.x2)/2,my=(e.y1+e.y2)/2;const h=hash(Math.floor(mx/.9)+(e.nx*7),Math.floor(my/.9)+(e.ny*5));
+   if(h>keep)continue;
+   const col=u<.5?mix(T.glow,T.mem,u*2):mix(T.mem,T.res,(u-.5)*2);
+   add('m',col,(1.45-.5*u).toFixed(2),(.95*E).toFixed(2),u<.55?'7 2.2':'3.2 3.6',d);}
+ }
+ let eg='';
+ for(const g of Object.values(groups))eg+=`<path d="${g.d.join('')}" fill="none" stroke="${g.col}" stroke-width="${g.w}" stroke-opacity="${g.op}" ${g.dash?`stroke-dasharray="${g.dash}"`:''} stroke-linecap="${g.dash?'butt':'round'}"/>`;
+ const fresh=Object.entries(groups).filter(([k])=>k.startsWith('f|')).map(([,g])=>g.d.join('')).join('');
+ out.edges=(fresh?`<path d="${fresh}" fill="none" stroke="${T.fresh}" stroke-width="5" stroke-opacity=".28" filter="url(#halo)"/>`:'')+eg;
+ // pressure seam: only the newest, still travelling front
+ const p0=sc.pings[0],F=fields[0],front=p0.age*9,cap=p0.maxc||13.5;
+ if(!sc.print&&front<cap+.3){let sm='',tr='';
+  for(let j=1;j<NY-1;j++)for(let i=1;i<NX-1;i++){const c=F[j*NX+i];if(c===Infinity||Math.abs(c-front)>.1)continue;
+   if(((i>>1)+(j>>1))%3===0)continue;
+   const a=F[j*NX+i+1],b=F[j*NX+i-1],u=F[(j+1)*NX+i],v=F[(j-1)*NX+i];
+   let gx=(isFinite(a)&&isFinite(b))?a-b:0,gy=(isFinite(u)&&isFinite(v))?u-v:0;const n=Math.hypot(gx,gy)||1;gx/=n;gy/=n;
+   const tx=-gy,ty=gx,x=sx((i+.5)*S),y=sy((j+.5)*S),l=3.6;
+   sm+=`M${f1(x-tx*l)} ${f1(y+ty*l)}L${f1(x+tx*l)} ${f1(y-ty*l)}`;}
+  out.seam=`<path d="${sm}" stroke="${T.fresh}" stroke-width="2.6" stroke-linecap="round" fill="none" stroke-opacity=".95"/>`;
+  // trailing softer seam
+  for(let j=1;j<NY-1;j++)for(let i=1;i<NX-1;i++){const c=F[j*NX+i];if(c===Infinity||Math.abs(c-(front-.5))>.08)continue;if((i+j)%2)continue;
+   tr+=`M${f1(sx((i+.5)*S))} ${f1(sy((j+.5)*S))}h.1`;}
+  out.seam+=`<path d="${tr}" stroke="${T.glow}" stroke-width="2" stroke-linecap="round" fill="none" stroke-opacity=".5"/>`;}
+ return out;}
+
+// "The Cut" concept: filled floor that erodes toward the centre line
+function drawCut(sc){
+ const fields=sc.pings.map(p=>field(p.o[0],p.o[1],p.maxc||13.5));sc.fields=fields;let r='';
+ const bone='#D9D1BD';
+ for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){const k=j*NX+i;if(!walk[k])continue;let best=Infinity,bc=0;
+  sc.pings.forEach((p,n)=>{const c=fields[n][k];if(c===Infinity)return;const t=p.age-c/9;if(t>=0&&t<best){best=t;bc=c;}});
+  if(best===Infinity||best>8)continue;
+  const er=best<1.4?0:Math.min(1.15,(best-1.4)/6.6*1.25);if(wd[k]<er)continue;
+  const lum=(best<.35?1:best<1.4?1-.35*(best-.35)/1.05:.6*(1-(best-1.4)/6.6)+.12)*en(bc);
+  r+=`<rect x="${f1(sx(i*S))}" y="${f1(sy((j+1)*S))}" width="${f1(S*cam.K+.6)}" height="${f1(S*cam.K+.6)}" fill="${mix('#151A16',bone,Math.min(1,lum*1.05))}"/>`;}
+ return r;}
+
+// ===================== HUD =====================
+function hud(vp,o={}){
+ const {PW,PH,m,top,bot,r,pill}=vp;const cx=PW-m-r,cy=PH-bot-r-22;
+ const cool=o.cool??0,ready=cool===0;const C=2*Math.PI*(r-3);
+ let s=`<text x="${m}" y="${top}" font-size="${vp.PW<340?16:18}" fill="${T.chalk}" font-family="Bitstream Charter,serif" font-style="italic">Listening Hall</text>`;
+ s+=`<g><circle cx="${PW-m-22}" cy="${top-6}" r="22" fill="none"/><rect x="${PW-m-29}" y="${top-17}" width="4.5" height="22" rx="1.5" fill="${T.ui}"/><rect x="${PW-m-19}" y="${top-17}" width="4.5" height="22" rx="1.5" fill="${T.ui}"/></g>`;
+ s+=`<g><circle cx="${cx}" cy="${cy}" r="${r}" fill="${T.black}" fill-opacity=".88" stroke="${T.ui}" stroke-opacity=".35" stroke-width="1.3"/>
+ <circle cx="${cx}" cy="${cy}" r="${r-3}" fill="none" stroke="${ready?T.fresh:T.res}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="${(C*(ready?1:cool)).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"/>
+ <g transform="translate(${cx} ${cy-9})" fill="none" stroke="${o.pressed?T.fresh:T.chalk}" stroke-linecap="round"><circle r="${o.pressed?5:6}" stroke-width="2.4"/><path d="M-12 -6A13.5 13.5 0 0 1 8 -11M13 2A13.5 13.5 0 0 1 -4 13" stroke-width="1.9" opacity=".8"/>${o.pressed?'':'<path d="M-19 4A20 20 0 0 1 -9 -16" stroke-width="1.4" opacity=".45"/>'}</g>
+ <text x="${cx}" y="${cy+r*.62}" text-anchor="middle" font-size="14" font-weight="650" fill="${T.chalk}" font-family="Inter">Echo</text></g>`;
+ const px=m,py=PH-bot-pill[1]-(r-pill[1]/2)-22+ (0);
+ const qy=cy-pill[1]/2;
+ s+=`<g><rect x="${px}" y="${qy}" width="${pill[0]}" height="${pill[1]}" rx="${pill[1]/2}" fill="${T.black}" fill-opacity=".88" stroke="${T.ui}" stroke-opacity=".4" stroke-width="1.3"/>
+ <path d="M${px+17} ${qy+pill[1]/2+4}q0-9 6-9t6 9z" fill="none" stroke="${T.ui}" stroke-width="1.7" stroke-linejoin="round"/>
+ <text x="${px+36}" y="${qy+pill[1]/2+5}" font-size="14" fill="${T.chalk}" font-family="Inter">${pill[0]>100?'Quiet step':'Quiet'}</text></g>`;
+ return s;}
+function railText(vp,lines,y,fs=17){const {PW}=vp;let s=`<rect x="0" y="${y-30}" width="${PW}" height="${lines.length*24+46}" fill="url(#fade)"/>`;lines.forEach((l,i)=>s+=`<text x="${PW/2}" y="${y+i*24}" text-anchor="middle" font-size="${fs}" fill="${T.chalk}" font-family="Inter">${l}</text>`);return s;}
+
+function defs(){return `<defs>
+<filter id="halo" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.4"/></filter>
+<filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="4"/><feColorMatrix type="matrix" values="0 0 0 0 .9  0 0 0 0 .88  0 0 0 0 .8  0 0 0 .55 -.18"/></filter>
+<radialGradient id="bg" cx="50%" cy="48%" r="80%"><stop offset="0" stop-color="#151A16"/><stop offset=".6" stop-color="#0E110E"/><stop offset="1" stop-color="#0B0D0B"/></radialGradient>
+<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0B0D0B" stop-opacity="0"/><stop offset=".3" stop-color="#0B0D0B" stop-opacity=".93"/><stop offset="1" stop-color="#0B0D0B" stop-opacity=".96"/></linearGradient>
+<linearGradient id="dev" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity=".16"/></linearGradient>
+<mask id="devmask"><rect x="-50" y="-50" width="500" height="500" fill="url(#dev)"/></mask></defs>`;}
+
+// ===================== wordmark: two time-separated exposures =====================
+function wordmark(x,y,s){
+ const L=['M56 0H8V80H56M8 38H44','M54 17C42 -5 6 -2 6 40C6 82 42 85 54 63','M8 0V80M50 0V80M8 52H50','M28 0C10 0 6 20 6 40C6 60 10 80 28 80C46 80 50 60 50 40C50 20 46 0 28 0Z'];
+ const off=[0,70,140,210],dash=['58 7 22 6 40 9','46 8 20 7 50 8','30 6 9 7 36 6 24 8','40 9 18 7 52 6'];
+ let a='',b='';
+ L.forEach((d,i)=>{a+=`<path transform="translate(${off[i]} 0)" d="${d}" stroke-dasharray="${dash[i]}"/>`;b+=`<path transform="translate(${off[i]+4.5} 4)" d="${d}"/>`;});
+ return `<g transform="translate(${x} ${y}) scale(${s})"><g mask="url(#devmask)" transform="translate(0 0)">
+ <g stroke="${T.mem}" stroke-width="1.8" fill="none" stroke-linejoin="round" opacity=".9">${b}</g>
+ <g stroke="${T.chalk}" stroke-width="7" fill="none" stroke-linejoin="round" stroke-linecap="butt">${a}</g></g>
+ <path d="M${268} -14Q276 40 268 94" stroke="${T.fresh}" stroke-width="2.4" fill="none" stroke-dasharray="9 5 3 5" stroke-linecap="round" opacity=".9"/></g>`;}
+
+// ===================== scenes =====================
+const SC={
+ s01:{kind:'title'},
+ s02:{world:'L01',cx:3,cy:3.3,px:3,py:3,pings:[{o:[3,3],age:1.65,maxc:5.6}],origins:[],cool:0,hint:'Tap the lit path to move',target:[3,7.6]},
+ s03:{world:'L01',cx:3,cy:3.3,px:3,py:3,pings:[{o:[3,3],age:.16}],origins:[{o:[3,3],kind:'fresh'}],cool:.87,pressed:true},
+ s04:{world:'L01',cx:6,cy:8.7,px:3,py:8.9,pings:[{o:[3,8.1],age:.85}],origins:[{o:[3,8.1],kind:'fresh'}],cool:.32,
+  chips:[{w:[3,8.1],d:[-18,16],t:'a'},{w:[3,8.9],d:[16,-16],t:'b'},{w:[8.1,10],d:[0,-22],t:'c'},{w:[10.5,5.4],d:[0,0],t:'d'}]},
+ s05:{world:'L01',cx:7,cy:10.8,px:11,py:13.5,pings:[{o:[11,13.5],age:.85},{o:[3,8.1],age:4.7}],origins:[{o:[11,13.5],kind:'fresh'},{o:[3,8.1],kind:'mem'}],cool:.32},
+ s06:{world:'L01',cx:11,cy:17.4,px:11,py:14.3,pings:[{o:[11,17],age:1.5}],origins:[{o:[11,17],kind:'heard'}],pred:{mode:'ghost',pos:[13.4,24],label:'seen 0.5 s ago'},cool:0,
+  line:['It heard the echo from the fork.','You are no longer there.'],
+  chips:[{w:[11,17],d:[-30,-24],t:'a'},{w:[11,14.3],d:[26,-14],t:'b'},{w:[13.4,24],d:[28,-18],t:'c'},{w:[16,13],d:[0,0],t:'d'},{w:[9.1,16.6],d:[-16,10],t:'e'}]},
+ s07:{world:'L01',cx:7,cy:11,px:11,py:12.2,K:13,pings:[{o:[11,17],age:2.4},{o:[11,13.5],age:3.1},{o:[3,8.1],age:3.9}],origins:[{o:[11,17],kind:'mem'},{o:[11,13.5],kind:'mem'},{o:[3,8.1],kind:'mem'}],review:true,frozenAll:true},
+ s08:{world:'L01',cx:11.5,cy:17.5,PYo:300,K:11.2,px:20,py:32,print:true,pings:[{o:[3,6],age:3},{o:[3,10],age:3},{o:[11,13.5],age:3},{o:[19,21],age:3}],result:true},
+ qa1:{world:'L01',cx:11,cy:13.7,px:11,py:13.7,pings:[{o:[11,13.5],age:9.5}],origins:[],cool:0,help:true},
+ qa2:{world:'TEST',cx:6,cy:10,px:4,py:10,pings:[{o:[4,10],age:.85}],origins:[{o:[4,10],kind:'fresh'}],cool:.32,sealed:true,hidden:[7.2,10]},
+ qa4:{world:'L01',cx:11.5,cy:20.5,px:14,py:17,K:17,pings:[{o:[11,17],age:3}],print:true,fail:true},
+ e1:{kind:'cutTitle'},
+ e2:{world:'L01',cx:6,cy:8.7,px:3,py:8.9,pings:[{o:[3,8.1],age:.85}],cool:.32,cut:true},
+ e3:{world:'L01',cx:11,cy:17.4,px:11,py:14.3,pings:[{o:[11,17],age:1.5},{o:[3,8.1],age:5.9}],pred:{mode:'ghost',pos:[13.4,24]},cool:0,cut:true,line:['It heard the echo from the fork.']}
+};
+
+function title(vp,cut){const {PW,PH,m,bot}=vp;
+ let s=`<rect width="${PW}" height="${PH}" fill="url(#bg)"/><rect width="${PW}" height="${PH}" filter="url(#grain)" opacity=".07"/>`;
+ const sc=PW<340?.64:.8,wx=(PW-(266*sc))/2;
+ s+=wordmark(wx,PH*.2,sc);
+ s+=`<text x="${PW/2}" y="${PH*.2+130*sc+54}" text-anchor="middle" font-size="${PW<340?16:19}" fill="${T.chalk}" font-family="Bitstream Charter,serif" font-style="italic">Can you find a way without seeing?</text>`;
+ s+=listener(PW*.36,PH*.66,T.chalk,1.5);
+ s+=`<circle cx="${PW*.36}" cy="${PH*.66-3}" r="25" fill="none" stroke="${T.chalk}" stroke-opacity=".2" stroke-dasharray="2 5"/>`;
+ const bw=PW<340?200:220,by=PH-bot-100;
+ s+=`<g><rect x="${(PW-bw)/2}" y="${by}" width="${bw}" height="56" rx="28" fill="${T.chalk}"/><text x="${PW/2}" y="${by+35}" text-anchor="middle" font-size="18" font-weight="650" fill="${T.black}" font-family="Inter">Begin</text></g>`;
+ s+=`<text x="${PW/2}" y="${PH-bot-16}" text-anchor="middle" font-size="14" fill="${T.ui}" font-family="Inter">Sound is optional. Every cue is also visual.</text>`;
+ return s;}
+
+function renderScene(key,vpn='full'){
+ const sc=JSON.parse(JSON.stringify(SC[key]));const vp=VP[vpn];
+ cam={PX:vp.PW/2,PY:sc.PYo?sc.PYo*(vp.PH/844):vp.PH*.5,cx:sc.cx,cy:sc.cy,K:sc.K?sc.K*(vp.PW/390):vp.K};
+ if(sc.result&&vpn==='compact'){cam.K*=.8;cam.PY=162;}
+ let o=`<svg xmlns="http://www.w3.org/2000/svg" width="${vp.PW}" height="${vp.PH}" viewBox="0 0 ${vp.PW} ${vp.PH}">${defs()}`;
+ if(sc.kind==='title'){return o+title(vp)+'</svg>';}
+ if(sc.kind==='cutTitle'){return o+cutTitle(vp)+'</svg>';}
+ setWorld(sc.world==='TEST'?TEST:L01,sc.world==='TEST'?1.2:1.2);
+ o+=`<rect width="${vp.PW}" height="${vp.PH}" fill="url(#bg)"/>`;
+ if(sc.cut){o+=cutScene(sc,vp);return o+'</svg>';}
+ o+=`<rect width="${vp.PW}" height="${vp.PH}" filter="url(#grain)" opacity=".06"/>`;
+ const pl=drawPlate(sc);o+=pl.edges+pl.seam;
+ const fade=a=>Math.max(0,1-Math.max(0,a-6)/2);
+ (sc.origins||[]).forEach((g,i)=>{const p=sc.pings[i]||sc.pings[0];o+=origin(sx(g.o[0]),sy(g.o[1]),g.kind,g.kind==='mem'?.8:1);});
+ if(sc.target){const tx=sx(sc.target[0]),ty=sy(sc.target[1]);
+  o+=`<path d="M${f1(sx(sc.px))} ${f1(sy(sc.py)-24)}L${f1(tx)} ${f1(ty+10)}" stroke="${T.chalk}" stroke-width="2.2" stroke-dasharray="0.1 7" stroke-linecap="round" opacity=".85"/><circle cx="${f1(tx)}" cy="${f1(ty)}" r="9" fill="none" stroke="${T.chalk}" stroke-width="1.8"/><circle cx="${f1(tx)}" cy="${f1(ty)}" r="3" fill="${T.chalk}"/>`;}
+ if(sc.pred){const c=cellOf(...sc.pred.pos);o+=beast(sx(sc.pred.pos[0]),sy(sc.pred.pos[1]),sc.pred.mode,1);
+  if(sc.pred.label)o+=`<text x="${f1(sx(sc.pred.pos[0])-30)}" y="${f1(sy(sc.pred.pos[1])+42)}" text-anchor="end" font-size="12.5" fill="${T.amber}" font-family="Inter" style="font-variant-numeric:tabular-nums" opacity=".95">${sc.pred.label}</text>`;}
+ if(sc.hidden){/* sealed test: nothing drawn for hidden predator */}
+ if(sc.review){o+=reviewUI(vp,sc);}
+ if(sc.result){o+=resultScene(vp,sc);}
+ if(sc.fail){o+=failScene(vp,sc);}
+ if(!sc.result&&!sc.fail){o+=`<circle cx="${f1(sx(sc.px))}" cy="${f1(sy(sc.py)-3)}" r="24" fill="none" stroke="${T.chalk}" stroke-opacity=".22" stroke-dasharray="2 5"/>`+listener(sx(sc.px),sy(sc.py)-3);}
+ if(sc.hint)o+=railText(vp,[sc.hint],vp.PH*.74);
+ if(sc.line)o+=railText(vp,sc.line,vp.PH*.735-(sc.line.length-1)*0,16.5);
+ if(sc.sealed)o+=`<text x="${vp.PW/2}" y="${vp.top+34}" text-anchor="middle" font-size="13.5" fill="${T.amber}" font-family="Inter" font-weight="600">Non-gameplay test chamber</text>`+sealedNotes(vp,sc);
+ if(sc.chips)sc.chips.forEach(c=>o+=chip(sx(c.w[0])+c.d[0],sy(c.w[1])+c.d[1],c.t));
+ if(!sc.result&&!sc.fail&&!sc.review&&!sc.sealed)o+=hud(vp,sc);
+ if(sc.sealed)o+=hud(vp,sc).replace('Listening Hall','Test chamber');
+ if(sc.help)o+=`<g><rect x="${vp.PW-vp.m-84}" y="${vp.top+14}" width="84" height="44" rx="22" fill="none" stroke="${T.ui}" stroke-opacity=".5" stroke-width="1.3"/><text x="${vp.PW-vp.m-42}" y="${vp.top+42}" text-anchor="middle" font-size="14" fill="${T.chalk}" font-family="Inter">Help</text></g>`;
+ return o+'</svg>';}
+
+function sealedNotes(vp,sc){ // marks the front face of the wall that was struck; nothing beyond it
+ return '';}
+
+function reviewUI(vp,sc){const {PW,PH,m,bot}=vp;
+ let s=`<circle cx="${f1(sx(sc.px))}" cy="${f1(sy(sc.py)-3)}" r="18" fill="none" stroke="${T.chalk}" stroke-opacity=".25" stroke-dasharray="2 5"/>`+listener(sx(sc.px),sy(sc.py)-3,T.chalk,1.1);
+ s+=`<g><rect x="${m}" y="${vp.top-26}" width="214" height="40" rx="20" fill="${T.black}" stroke="${T.ui}" stroke-opacity=".5" stroke-width="1.3"/><text x="${m+107}" y="${vp.top}" text-anchor="middle" font-size="14.5" fill="${T.chalk}" font-family="Inter">Reviewing. Game paused.</text></g>`;
+ const rx=PW-m-8;s+=`<path d="M${rx} 150V620" stroke="${T.res}" stroke-width="2.4" stroke-linecap="round"/><path d="M${rx} 150V470" stroke="${T.glow}" stroke-width="2.4" stroke-linecap="round"/><circle cx="${rx}" cy="470" r="11" fill="${T.black}" stroke="${T.fresh}" stroke-width="2.2"/><text x="${rx}" y="140" text-anchor="middle" font-size="13" fill="${T.ui}" font-family="Inter">Trace</text>`;
+ // echo time labels
+ [[3,8.1,'First echo','4 s ago'],[11,13.5,'Second echo','3 s ago'],[11,17,'Third echo','2 s ago']].forEach(([x,y,a,b],i)=>{const X=sx(x),Y=sy(y);const left=x<8;
+  s+=`<g font-family="Inter" font-size="12.5" fill="${T.ui}"><text x="${f1(X+(left?-16:18))}" y="${f1(Y-4)}" text-anchor="${left?'end':'start'}" fill="${T.chalk}">${a}</text><text x="${f1(X+(left?-16:18))}" y="${f1(Y+13)}" text-anchor="${left?'end':'start'}" style="font-variant-numeric:tabular-nums">${b}</text></g>`;});
+ s+=`<g><rect x="${(PW-250)/2}" y="${PH-bot-70}" width="250" height="56" rx="28" fill="${T.chalk}"/><text x="${PW/2}" y="${PH-bot-35}" text-anchor="middle" font-size="17" font-weight="650" fill="${T.black}" font-family="Inter">Return to listener</text></g>`;
+ return s;}
+
+function resultScene(vp,sc){const {PW,PH,m,bot}=vp;
+ const route=[[3,3],[3,10],[11,10],[11,17],[19,17],[19,26],[20,32]];
+ let d='';route.forEach((p,i)=>d+=(i?'L':'M')+f1(sx(p[0]))+' '+f1(sy(p[1])));
+ let s=`<path d="${d}" fill="none" stroke="${T.fresh}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="1 0"/>`;
+ sc.pings.forEach(p=>s+=origin(sx(p.o[0]),sy(p.o[1]),'fresh',.95));
+ const ex=sx(20),ey=sy(32);s+=`<g transform="translate(${f1(ex)} ${f1(ey)})" fill="none" stroke="${T.exit}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M-9 8V-4Q-9 -12 0 -12T9 -4V8"/><path d="M0 -12V8" stroke-dasharray="3 3"/></g>`;
+ s+=`<circle cx="${f1(sx(3))}" cy="${f1(sy(3))}" r="3.4" fill="${T.chalk}"/>`;
+ const sm=PW<340;const ty=sm?322:PH*.675;
+ s+=`<text x="${m+4}" y="${ty}" font-size="${sm?27:32}" fill="${T.chalk}" font-family="Bitstream Charter,serif">Exit reached</text>`;
+ s+=`<text x="${m+4}" y="${ty+30}" font-size="${sm?15:16.5}" fill="${T.ui}" font-family="Inter">4 echoes.</text>`;
+ s+=`<text x="${m+4}" y="${ty+54}" font-size="${sm?15:16.5}" fill="${T.chalk}" font-family="Inter">The third echo drew the listener</text><text x="${m+4}" y="${ty+76}" font-size="${sm?15:16.5}" fill="${T.chalk}" font-family="Inter">toward the hall.</text>`;
+ const by=PH-bot-124;
+ s+=`<g><rect x="${m}" y="${by+(sm?-8:0)}" width="${PW-2*m}" height="56" rx="28" fill="${T.chalk}"/><text x="${PW/2}" y="${by+(sm?-8:0)+35}" text-anchor="middle" font-size="17" font-weight="650" fill="${T.black}" font-family="Inter">Next level</text></g>`;
+ s+=`<g><rect x="${m}" y="${by+(sm?54:66)}" width="${PW-2*m}" height="48" rx="24" fill="none" stroke="${T.ui}" stroke-opacity=".6" stroke-width="1.4"/><text x="${PW/2}" y="${by+(sm?54:66)+31}" text-anchor="middle" font-size="16" fill="${T.chalk}" font-family="Inter">Retry</text></g>`;
+ return s;}
+
+function failScene(vp,sc){const {PW,PH,m,bot}=vp;
+ const route=[[13.4,24],[11,24],[11,17]];
+ let d='';route.forEach((p,i)=>d+=(i?'L':'M')+f1(sx(p[0]))+' '+f1(sy(p[1])));
+ let s=`<path d="${d}" fill="none" stroke="${T.danger}" stroke-width="2.4" stroke-dasharray="9 6" stroke-linecap="round" stroke-linejoin="round"/>`;
+ s+=beast(sx(13.4),sy(24),'ghost',.9);
+ s+=origin(sx(11),sy(17),'heard',1);
+ s+=beast(sx(12.1),sy(17),'direct',1);
+ s+=`<g><rect x="${f1(sx(11.1)-2)}" y="${f1(sy(17)+26)}" width="0" height="0"/></g>`;
+ s+=listener(sx(14.4),sy(17)-3,T.chalk,1.2);
+ s+=`<text x="${f1(sx(11)-16)}" y="${f1(sy(17)+30)}" font-size="12.5" fill="${T.amber}" text-anchor="end" font-family="Inter">your echo</text>`;
+ s+=`<text x="${f1(sx(13.4)+26)}" y="${f1(sy(24)+4)}" font-size="12.5" fill="${T.danger}" font-family="Inter">heard it at 1.0 s</text>`;
+ s+=`<text x="${f1(sx(14.4))}" y="${f1(sy(17)+34)}" text-anchor="middle" font-size="12.5" fill="${T.chalk}" font-family="Inter">you</text>`;
+ s+=`<g><rect x="${m}" y="${vp.top-28}" width="${PW-2*m}" height="46" rx="10" fill="${T.black}" stroke="${T.amber}" stroke-opacity=".7" stroke-width="1.3"/><text x="${PW/2}" y="${vp.top-6}" text-anchor="middle" font-size="13.5" fill="${T.amber}" font-family="Inter" font-weight="600">Explanation view. Shown after the round.</text></g>`;
+ s+=`<rect x="0" y="${PH-300}" width="${PW}" height="300" fill="url(#fade)"/>`;
+ s+=`<text x="${m+4}" y="${PH-232}" font-size="26" fill="${T.chalk}" font-family="Bitstream Charter,serif">Found at the fork</text>`;
+ s+=`<text x="${m+4}" y="${PH-200}" font-size="16" fill="${T.chalk}" font-family="Inter">The listener heard your echo, walked to where</text><text x="${m+4}" y="${PH-178}" font-size="16" fill="${T.chalk}" font-family="Inter">you cast it, and saw you 3 m away.</text>`;
+ s+=`<g><rect x="${m}" y="${PH-bot-124}" width="${PW-2*m}" height="60" rx="30" fill="${T.chalk}"/><text x="${PW/2}" y="${PH-bot-124+37}" text-anchor="middle" font-size="18" font-weight="650" fill="${T.black}" font-family="Inter">Retry</text></g>`;
+ s+=`<g><rect x="${m}" y="${PH-bot-52}" width="${PW-2*m}" height="46" rx="23" fill="none" stroke="${T.ui}" stroke-opacity=".6" stroke-width="1.4"/><text x="${PW/2}" y="${PH-bot-52+30}" text-anchor="middle" font-size="16" fill="${T.chalk}" font-family="Inter">Review path</text></g>`;
+ return s;}
+
+// ===================== concept E: The Cut =====================
+function cutTitle(vp){const {PW,PH,bot}=vp;const bone='#D9D1BD';
+ let s=`<rect width="${PW}" height="${PH}" fill="#0B0D0B"/>`;
+ // a slab of light with ECHO cut out of it
+ s+=`<rect x="0" y="${PH*.16}" width="${PW}" height="${PH*.3}" fill="${bone}" opacity=".88"/>`;
+ s+=`<g transform="translate(${(PW-266*.8)/2} ${PH*.2}) scale(.8)" stroke="#0B0D0B" stroke-width="9" fill="none" stroke-linejoin="round">${['M56 0H8V80H56M8 38H44','M54 17C42 -5 6 -2 6 40C6 82 42 85 54 63','M8 0V80M50 0V80M8 52H50','M28 0C10 0 6 20 6 40C6 60 10 80 28 80C46 80 50 60 50 40C50 20 46 0 28 0Z'].map((d,i)=>`<path transform="translate(${i*70} 0)" d="${d}"/>`).join('')}</g>`;
+ s+=`<text x="${PW/2}" y="${PH*.5+8}" text-anchor="middle" font-size="19" fill="${T.chalk}" font-family="Bitstream Charter,serif" font-style="italic">Can you find a way without seeing?</text>`;
+ s+=listener(PW*.36,PH*.68,T.chalk,1.5);
+ s+=`<g><rect x="${(PW-220)/2}" y="${PH-bot-100}" width="220" height="56" rx="6" fill="${T.chalk}"/><text x="${PW/2}" y="${PH-bot-65}" text-anchor="middle" font-size="18" font-weight="650" fill="${T.black}" font-family="Inter">Begin</text></g>`;
+ s+=`<text x="${PW/2}" y="${PH-bot-16}" text-anchor="middle" font-size="14" fill="${T.ui}" font-family="Inter">Sound is optional. Every cue is also visual.</text>`;
+ return s;}
+function cutScene(sc,vp){let o=cutPaint(sc);
+ if(sc.pred){const x=sx(sc.pred.pos[0]),y=sy(sc.pred.pos[1]);o+=`<g transform="translate(${f1(x)} ${f1(y)})" fill="none" stroke="${T.danger}" stroke-width="2.2" stroke-dasharray="0.1 5" stroke-linecap="round"><circle r="26"/><path d="M-14 8Q-12 -6 -2 -9Q7 -11 11 -4"/><path d="M11 -4L16 -8L19 -4L15 -1"/></g>`;}
+ o+=`<circle cx="${f1(sx(sc.px))}" cy="${f1(sy(sc.py)-3)}" r="24" fill="none" stroke="${T.chalk}" stroke-opacity=".3" stroke-dasharray="2 5"/>`+listener(sx(sc.px),sy(sc.py)-3);
+ if(sc.pings[0].age<1.3){const F=sc.fields[0];}
+ if(sc.line)o+=railText(vp,sc.line,vp.PH*.74,16.5);
+ return o+hud(vp,sc);}
+function cutPaint(sc){return drawCut(sc);}
+
+// ===================== page assembly =====================
+function phone(key,vpn='full',cls=''){const vp=VP[vpn];return `<div class="phone ${cls}" style="width:${vp.PW}px;height:${vp.PH}px">${renderScene(key,vpn)}</div>`;}
+function col(key,cap,vpn='full',cls='',legend=''){return `<div class="col" style="width:${VP[vpn].PW}px">${phone(key,vpn,cls)}<div class="cap">${cap}</div>${legend}</div>`;}
+const root=document.getElementById('root');
+function sheet(id,title,sub,body){const d=document.createElement('div');d.className='sheet';d.id=id;d.innerHTML=`<h2>${title}</h2><p class="sub">${sub}</p>${body}`;root.appendChild(d);}
+
+// --- system board
+function lum(h){const [r,g,b]=hx(h).map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*r+.7152*g+.0722*b;}
+const cr=(a,b)=>{const A=lum(a),B=lum(b);return ((Math.max(A,B)+.05)/(Math.min(A,B)+.05)).toFixed(1);};
+const pal=[['Plate black','#0B0D0B','Unknown space and base. Slightly lifted for OLED control'],['Substrate','#151A16','Quiet material only, never information'],['Paper chalk','#E6E0D2','Functional text, the player glyph, primary actions'],['Fresh contact','#CDE9BB','Wall face touched in the last 0.35 s, the pressure seam'],['Active afterglow','#9FC19B','Contacted 0.35 to 1.4 s ago'],['Verified memory','#718B70','Static geometry 1.4 to 5 s old, segmented line'],['Near-expired residue','#4E624F','5 to 8 s old, eroding. Never carries required information'],['Caution amber','#F4BE70','A sound event may have consequences: heard origin'],['Confirmed danger','#E98158','Predator sensed now by direct contact'],['Exit','#F1D17C','Exit only once legitimately sensed or reached'],['Secondary UI','#AEB9A8','Quiet labels and control outlines']];
+function ageRamp(){let s='<svg width="860" height="150" viewBox="0 0 860 150"><rect width="860" height="150" fill="#0B0D0B"/>';
+ const st=[['0 to 0.35 s','Fresh contact',T.fresh,2.3,''],['0.35 to 1.4 s','Afterglow',T.glow,1.7,''],['1.4 to 5 s','Verified memory',T.mem,1.3,'7 2.2'],['5 to 8 s','Eroding residue',T.res,1,'3.2 3.6'],['after 8 s','Unknown again','#0B0D0B',0,'']];
+ st.forEach((a,i)=>{const x=16+i*166;s+=`<path d="M${x} 16V80M${x+14} 16V80M${x+28} 16V80" stroke="${a[2]}" stroke-width="${a[3]}" ${a[4]?`stroke-dasharray="${a[4]}"`:''} stroke-linecap="${a[4]?'butt':'round'}"/><path d="M${x+22} 20V78" stroke="${a[2]}" stroke-width="${a[3]}" ${a[4]?`stroke-dasharray="${a[4]}"`:''} stroke-opacity=".0"/><text x="${x}" y="104" font-size="13" fill="${T.chalk}" font-family="Inter" font-weight="600">${a[1]}</text><text x="${x}" y="122" font-size="12.5" fill="${T.ui}" font-family="Inter">${a[0]}</text>`;});
+ return s+'</svg>';}
+function predPanel(gray){return `<svg width="540" height="150" viewBox="0 0 540 150" style="${gray?'filter:grayscale(1)':''}"><rect width="540" height="150" fill="#0B0D0B"/>
+ ${beast(70,56,'direct',1.5)}<text x="20" y="120" font-size="13" fill="${T.chalk}" font-family="Inter" font-weight="600">Sensed now</text><text x="20" y="138" font-size="12.5" fill="${T.ui}" font-family="Inter">solid broken line</text>
+ ${beast(248,56,'ghost',1.5)}<text x="198" y="120" font-size="13" fill="${T.chalk}" font-family="Inter" font-weight="600">Last seen</text><text x="198" y="138" font-size="12.5" fill="${T.ui}" font-family="Inter">dotted, gone in 1.25 s</text>
+ ${origin(450,56,'heard',1)}<text x="384" y="120" font-size="13" fill="${T.chalk}" font-family="Inter" font-weight="600">Heard, not seen</text><text x="384" y="138" font-size="12.5" fill="${T.ui}" font-family="Inter">no creature drawn</text></svg>`;}
+function glyphPanel(){return `<svg width="540" height="150" viewBox="0 0 540 150"><rect width="540" height="150" fill="#0B0D0B"/>
+ ${listener(50,52,T.chalk,1.7)}<text x="20" y="116" font-size="13" fill="${T.chalk}" font-family="Inter" font-weight="600">You</text><text x="20" y="134" font-size="12.5" fill="${T.ui}" font-family="Inter">broken tine, moves</text>
+ ${origin(190,56,'fresh',1)}<text x="150" y="116" font-size="13" fill="${T.chalk}" font-family="Inter" font-weight="600">Cast origin</text><text x="150" y="134" font-size="12.5" fill="${T.ui}" font-family="Inter">fixed, never moves</text>
+ <g transform="translate(335 56)" fill="none" stroke="${T.exit}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M-12 12V-5Q-12 -16 0 -16T12 -5V12"/><path d="M0 -16V12" stroke-dasharray="3 3"/></g><text x="300" y="116" font-size="13" fill="${T.chalk}" font-family="Inter" font-weight="600">Exit</text><text x="300" y="134" font-size="12.5" fill="${T.ui}" font-family="Inter">split arch</text>
+ <g transform="translate(455 56)"><rect x="-30" y="-24" width="60" height="48" rx="12" fill="#0B0D0B" stroke="#2b332c"/>${listener(0,-1,T.chalk,1.35)}</g><text x="420" y="116" font-size="13" fill="${T.chalk}" font-family="Inter" font-weight="600">App icon</text><text x="420" y="134" font-size="12.5" fill="${T.ui}" font-family="Inter">concept only</text></svg>`;}
+sheet('sys','D. The Listening Plate. System board','Every mark comes from one state variable and has an age. No blue, no teal, no fake instrument. Contrast values are computed here against the plate black for flat swatches only. They are not proof for thin moving lines.',
+ `<div class="grid" style="grid-template-columns:1fr 1fr;align-items:start">
+ <div style="display:flex;flex-direction:column;gap:26px"><div class="panel"><h3>Role-based colour tokens</h3><table><tr><th></th><th>Role</th><th>Hex</th><th>vs plate</th></tr>${pal.map(p=>`<tr><td><span class="sw" style="background:${p[1]}"></span></td><td><b>${p[0]}</b><br><span style="color:#8d998a;font-size:12.5px">${p[2]}</span></td><td style="font-variant-numeric:tabular-nums">${p[1]}</td><td style="font-variant-numeric:tabular-nums">${cr(p[1],'#0B0D0B')}:1</td></tr>`).join('')}</table></div><div class="panel"><h3>Type roles</h3><p><b>Wordmark:</b> built from two time-separated exposures, bespoke, so no font licence is needed.<br><b>Chapter voice:</b> an editorial serif for level names and result headlines. Charter here is a stand-in, the final face still has to be licensed.<br><b>Functional UI:</b> Inter at 14 to 18 px for every control and instruction.<br><b>Numerals:</b> tabular, only for logged values.</p></div></div>
+ <div style="display:flex;flex-direction:column;gap:26px">
+ <div class="panel"><h3>Age grammar for static walls</h3><p>Colour, weight and line style all change, so the stages still read in grayscale. Memory erodes in roughly 1 m chunks, not as an even fade, and never invents a doorway.</p>${ageRamp()}</div>
+ <div class="panel"><h3>Three kinds of danger, three shapes</h3>${predPanel(false)}<div style="height:10px"></div>${predPanel(true)}</div>
+ <div class="panel"><h3>Glyphs</h3>${glyphPanel()}</div>
+</div></div>`);
+
+// --- sheet 1: frames 01-04
+sheet('s1','Frames 01 to 04. From unexposed plate to the first pulse','Static art, but every wall, seam and edge age below is drawn from a real weighted shortest-path solver on the L01 corridor geometry (cost field, 9 m/s, 13.5 m cap). It is not in-engine and not device-tested.',
+ `<div class="phones">`+
+ col('s01','<b>01 Unexposed plate.</b> <span>The wordmark is half developed. Nothing of L01 is previewed behind it.</span>')+
+ col('s02','<b>02 First playable frame.</b> <span>Only the start chamber is lit. The dotted line and ring show the move scheme: tap a lit path.</span>')+
+ col('s03','<b>03 First pulse at the origin.</b> <span>0.16 s after the cast. The Echo button is mid-cooldown. Fixed origin scar under you.</span>')+
+ col('s04','<b>04 Pulse at the corner, 0.85 s.</b> <span>The seam bends around the real corner. The older walls are already softer.</span>','full','',
+ `<div class="legend"><div><i>a</i>Cast origin. Fixed in the world.</div><div><i>b</i>You, already moved off it.</div><div><i>c</i>Seam following the connected corridor.</div><div><i>d</i>Honest black. Never drawn.</div></div>`)+
+ `</div>`);
+// --- sheet 2: frames 05-08
+sheet('s2','Frames 05 to 08. Age, cost and consequence','Frame 06 is the one that matters. The echo was cast at the fork, the listener heard it there, and you are no longer there. No creature is drawn at its live position.',
+ `<div class="phones">`+
+ col('s05','<b>05 Two echoes of different ages.</b> <span>Fresh crisp walls at your position. The older echo is segmented and eroding, with its own fixed origin.</span>')+
+ col('s06','<b>06 Heard the old origin.</b> <span>Amber incision at the fork, you below it, a dissolving last-seen ghost. No arrow to a hidden predator.</span>','full','',
+ `<div class="legend"><div><i>a</i>Old cast origin. Fixed. Heard.</div><div><i>b</i>You, now.</div><div><i>c</i>Last-seen ghost, 0.5 s old.</div><div><i>d</i>Unknown. Black.</div><div><i>e</i>Memory, eroding in chunks.</div></div>`)+
+ col('s07','<b>07 Trace review.</b> <span>Zoom 0.65. Game paused. Only echoed geography and your three origins. Return is one large button.</span>')+
+ col('s08','<b>08 Result.</b> <span>The route you travelled, your four echoes and the exit you reached. Retry is always one tap.</span>')+
+ `</div>`);
+// --- sheet 3: QA
+sheet('s3','QA frames. Where the design is meant to break','These are the frames the critique says the first round never showed.',
+ `<div class="phones">`+
+ col('qa1','<b>No-ping world, 9.5 s after the last echo.</b> <span>Everything has expired. You, Echo, Quiet step, Pause and Help are still findable.</span>','full')+
+ col('qa2','<b>Sealed wall test.</b> <span>Ping 0.85 s ago. The wall face toward you develops. The far corridor and the hidden predator in it do not. Non-gameplay chamber.</span>','full')+
+ col('s06','<b>Frame 06 in grayscale.</b> <span>Age stages and the three danger shapes must still separate without hue.</span>','full','gray')+
+ col('qa4','<b>Failure explanation.</b> <span>Shown only after the round, and labelled. Built from the event log: the echo, the walk to it, and the sighting.</span>','full')+
+ `</div>`);
+// --- sheet 4: compact
+sheet('s4','320 by 568 compact phone. Reflowed, not scaled','Telemetry removed before control sizes were reduced. Echo stays 76 px across. Text blocks re-wrap.',
+ `<div class="phones">`+['s01','s02','s04','s06','s08'].map((k,i)=>col(k,['<b>01</b> Title','<b>02</b> First move','<b>04</b> Corner, 0.85 s','<b>06</b> Heard the old origin','<b>08</b> Result'][i],'compact')).join('')+`</div>`);
+// --- sheet 5: concept E
+sheet('s5','Counter-proposal E. The Cut','A different account of sound. D develops edges on a plate. E carves a lit shape out of darkness, and memory shrinks that shape toward the centre of the corridor until only a thin safe thread is left. Fill, not line, and no outline at all.',
+ `<div class="phones">`+
+ col('e1','<b>Title.</b> <span>The wordmark is cut out of a slab of light.</span>')+
+ col('e2','<b>Pulse at the corner, 0.85 s.</b> <span>The corridor is lit as a filled shape. The wall is just where the light ends.</span>')+
+ col('e3','<b>Heard the old origin.</b> <span>The old echo has shrunk to a thread. The new one is a full body of light.</span>')+
+ `</div>`);
+</script></body></html>

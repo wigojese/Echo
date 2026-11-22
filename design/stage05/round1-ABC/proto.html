@@ -1,0 +1,213 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>ECHO visual directions</title>
+<style>
+:root{--bath:#07131C;--void:#0C2230;--fresh:#8FE2D4;--cyan:#2FA7B5;--aged:#3B6F73;--amber:#EFC17A;--chalk:#DAD4BE}
+*{box-sizing:border-box}
+body{margin:0;background:#03090e;font-family:Inter,sans-serif;color:var(--chalk)}
+.row{width:1380px;padding:44px 50px 50px;background:#03090e}
+.row h2{font:600 26px/1.2 Inter;margin:0 0 6px;letter-spacing:-.01em}
+.row p{margin:0 0 28px;font:400 15px/1.5 Inter;color:#8aa3a6;max-width:900px}
+.phones{display:flex;gap:36px}
+.phone{width:390px;height:844px;border-radius:34px;overflow:hidden;position:relative;border:1px solid #17313f;flex:none}
+.phone svg{display:block}
+.cap{font:500 13px Inter;color:#6f8d92;margin-top:10px;width:390px}
+.col{display:flex;flex-direction:column}
+</style></head><body>
+<div id="root"></div>
+<script>
+// ---------- world ----------
+const S=0.2,NX=120,NY=180,K=20,PW=390,PH=844,PX=195,PY=422;
+const strips=[[3,3,3,10],[3,10,11,10],[11,10,11,17],[11,17,19,17],[19,17,19,26],[19,26,20,32],[11,17,5,17],[5,17,5,19],[11,17,11,24],[11,24,19,24],[11,24,11,29],[19,17,22,17]];
+const walk=new Uint8Array(NX*NY);
+function dseg(px,py,a,b,c,d){const dx=c-a,dy=d-b,l=dx*dx+dy*dy;let t=l?((px-a)*dx+(py-b)*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(px-(a+t*dx),py-(b+t*dy));}
+for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){const x=(i+.5)*S,y=(j+.5)*S;for(const s of strips){if(dseg(x,y,...s)<=1.2){walk[j*NX+i]=1;break;}}}
+const W=(i,j)=>i>=0&&j>=0&&i<NX&&j<NY&&walk[j*NX+i];
+// edges: wall faces
+const edges=[];
+for(let j=0;j<NY;j++)for(let i=0;i<NX;i++){if(!walk[j*NX+i])continue;const x0=i*S,y0=j*S,x1=x0+S,y1=y0+S,c=j*NX+i;
+ if(!W(i-1,j))edges.push({x1:x0,y1:y0,x2:x0,y2:y1,nx:-1,ny:0,c});
+ if(!W(i+1,j))edges.push({x1:x1,y1:y0,x2:x1,y2:y1,nx:1,ny:0,c});
+ if(!W(i,j-1))edges.push({x1:x0,y1:y0,x2:x1,y2:y0,nx:0,ny:-1,c});
+ if(!W(i,j+1))edges.push({x1:x0,y1:y1,x2:x1,y2:y1,nx:0,ny:1,c});}
+// dijkstra
+function field(ox,oy,maxc=13.5){const cost=new Float64Array(NX*NY).fill(Infinity);const h=[];
+ const push=(c,k)=>{h.push([c,k]);let n=h.length-1;while(n>0){const p=(n-1)>>1;if(h[p][0]<=h[n][0])break;[h[p],h[n]]=[h[n],h[p]];n=p;}};
+ const pop=()=>{const t=h[0],l=h.pop();if(h.length){h[0]=l;let n=0;for(;;){let a=2*n+1,b=a+1,m=n;if(a<h.length&&h[a][0]<h[m][0])m=a;if(b<h.length&&h[b][0]<h[m][0])m=b;if(m===n)break;[h[m],h[n]]=[h[n],h[m]];n=m;}}return t;};
+ const s=Math.floor(oy/S)*NX+Math.floor(ox/S);cost[s]=0;push(0,s);
+ while(h.length){const [c,k]=pop();if(c>cost[k])continue;const i=k%NX,j=(k/NX)|0;
+  for(let dj=-1;dj<=1;dj++)for(let di=-1;di<=1;di++){if(!di&&!dj)continue;const a=i+di,b=j+dj;if(!W(a,b))continue;
+   if(di&&dj&&(!W(i+di,j)||!W(i,j+dj)))continue;const nc=c+S*(di&&dj?1.4142:1);if(nc>maxc)continue;const nk=b*NX+a;if(nc<cost[nk]){cost[nk]=nc;push(nc,nk);}}}
+ return cost;}
+const cellOf=(x,y)=>Math.floor(y/S)*NX+Math.floor(x/S);
+const g=t=>t<0?0:t<.35?1:t<1.4?1-.45*(t-.35)/1.05:t<8?.55*Math.pow(1-(t-1.4)/6.6,1.3)+.03:0;
+const en=c=>.45+.55*Math.max(0,1-c/13.5);
+// colour helpers
+const hx=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const mix=(a,b,t)=>{const A=hx(a),B=hx(b);return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join('');};
+
+// ---------- scenes ----------
+const scenes={
+ title:{cx:6.75,cy:16.9,px:3,py:6,pings:[{o:[3,6],age:1.25},{o:[3,12],age:5.2}],ui:'title'},
+ reveal:{cx:11,cy:13.5,px:11,py:13.5,pings:[{o:[11,13.5],age:.85},{o:[3,8],age:5.6}],cool:.32,ui:'reveal',prompt:'Move toward the light while it lasts.'},
+ threat:{cx:11,cy:20.5,px:11,py:20.5,pings:[{o:[11,20.5],age:.9},{o:[11,14],age:3.8}],pred:[13.4,24],cool:.28,ui:'threat',prompt:'It heard where you were, not where you are.'}
+};
+const sx=x=>PX+(x-scenes._cx)*K, sy=y=>PY-(y-scenes._cy)*K;
+const f1=n=>n.toFixed(1);
+
+function compute(sc){
+ scenes._cx=sc.cx;scenes._cy=sc.cy;
+ sc.fields=sc.pings.map(p=>field(p.o[0],p.o[1]));
+ const q=sc.pings[0],F=sc.fields[0];
+ sc.front=q.age*9;
+ const E=[];
+ for(const e of edges){let I=0,fresh=0,c0=Infinity;
+  sc.pings.forEach((p,k)=>{const c=sc.fields[k][e.c];if(c===Infinity)return;const t=p.age-c/9;const v=g(t)*en(c);if(v>I){I=v;c0=c;}if(t>=0&&t<.35)fresh=Math.max(fresh,en(c));});
+  if(I>.025)E.push({...e,I,fresh,c:c0});}
+ sc.E=E;return sc;}
+
+// ---------- shared drawing ----------
+function bucketPaths(E,opts){const B=Array.from({length:12},()=>[]);
+ for(const e of E){const b=Math.min(11,Math.floor(e.I*12));B[b].push(`M${f1(sx(e.x1))} ${f1(sy(e.y1))}L${f1(sx(e.x2))} ${f1(sy(e.y2))}`);}
+ return B.map((a,b)=>a.length?`<path d="${a.join('')}" stroke="${mix(opts.lo,opts.hi,b/11)}" stroke-opacity="${(.25+.75*(b+.5)/12).toFixed(2)}" stroke-width="${opts.w}" fill="none" stroke-linecap="round"/>`:'').join('');}
+
+function glyph(x,y,col,sc=1){return `<g transform="translate(${x} ${y}) scale(${sc})" fill="none" stroke="${col}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M-5.5 -12V-2.5Q-5.5 3 0 3Q5.5 3 5.5 -2.5V-8"/><path d="M0 3V12"/><circle cx="0" cy="14.5" r="1.1" fill="${col}"/></g>`;}
+
+function predator(sc,th){if(!sc.pred)return'';const c=cellOf(...sc.pred),cost=sc.fields[0][c];if(cost>sc.front)return'';
+ const x=sx(sc.pred[0]),y=sy(sc.pred[1]);
+ return `<g transform="translate(${f1(x)} ${f1(y)})" fill="none" stroke="#EFC17A" stroke-linecap="round" stroke-linejoin="round" ${th.glow?'filter="url(#glow)"':''}>
+ <circle r="25" stroke-width="1" stroke-dasharray="1.5 4.5" opacity=".7"/>
+ <path d="M-14 8Q-12 -6 -2 -9Q7 -11 11 -4" stroke-width="2" stroke-dasharray="9 5 3 5"/>
+ <path d="M11 -4L16 -8L19 -4L15 -1" stroke-width="2"/>
+ <path d="M-9 7L-12 16M-3 6L-4 17M5 3L8 14" stroke-width="1.8" stroke-dasharray="6 4"/>
+ <path d="M-14 8L-19 5" stroke-width="1.6" stroke-dasharray="3 4"/></g>`;}
+
+function pursuerMark(sc){if(!sc.pred)return'';const dx=sc.pred[0]-sc.px,dy=sc.pred[1]-sc.py,a=Math.atan2(dy,dx);const r=62;
+ const x=PX+Math.cos(a)*r,y=PY-(-Math.sin(a))*r*-1;const X=PX+Math.cos(a)*r,Y=PY-Math.sin(a)*r;
+ return `<g transform="translate(${f1(X)} ${f1(Y)}) rotate(${-a*180/Math.PI})" fill="none" stroke="#EFC17A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M-5 -9L6 0L-5 9"/><path d="M-12 -5L-5 0L-12 5" opacity=".5"/></g>`;}
+
+function hud(sc,th){
+ const lab=`font-family:${th.ui};`;
+ const cool=sc.cool??0;const C=2*Math.PI*38;
+ const btn=`<g><circle cx="318" cy="740" r="38" fill="#07131C" fill-opacity=".78" stroke="${th.line}" stroke-opacity=".5" stroke-width="1.2"/>
+ <circle cx="318" cy="740" r="38" fill="none" stroke="${th.fresh}" stroke-width="3" stroke-linecap="round" stroke-dasharray="${(C*cool).toFixed(1)} ${C}" transform="rotate(-90 318 740)"/>
+ <circle cx="318" cy="740" r="9" fill="none" stroke="${th.chalk}" stroke-width="1.6"/><circle cx="318" cy="740" r="17" fill="none" stroke="${th.chalk}" stroke-width="1.2" opacity=".6"/><circle cx="318" cy="740" r="25" fill="none" stroke="${th.chalk}" stroke-width=".9" opacity=".32"/>
+ <text x="318" y="796" text-anchor="middle" font-size="13" fill="${th.chalk}" style="${lab}" opacity=".85">Echo</text></g>`;
+ const quiet=`<g><rect x="72" y="722" width="104" height="36" rx="18" fill="#07131C" fill-opacity=".78" stroke="${th.line}" stroke-opacity=".4"/><text x="124" y="745" text-anchor="middle" font-size="14" fill="${th.chalk}" style="${lab}">Quiet step</text></g>`;
+ const top=`<text x="22" y="76" font-size="15" fill="${th.chalk}" style="${lab}">Listening Hall</text><text x="22" y="96" font-size="13" fill="${th.chalk}" opacity=".55" style="${lab}">Level 1</text>`;
+ let prompt=sc.prompt?`<rect x="0" y="610" width="390" height="234" fill="url(#fade)"/>`:'';
+ if(sc.prompt){const lines=sc.prompt.length>34?[sc.prompt.slice(0,sc.prompt.lastIndexOf(' ',24)),sc.prompt.slice(sc.prompt.lastIndexOf(' ',24)+1)]:[sc.prompt];
+   prompt+=lines.map((l,i)=>`<text x="195" y="${660+i*22}" text-anchor="middle" font-size="16" fill="${th.chalk}" opacity=".92" style="${th.promptStyle||lab}">${l}</text>`).join('');}
+ return top+prompt+quiet+btn;}
+
+// ---------- themes ----------
+const themes={
+ A:{name:'Oscilloscope laboratory',ui:'JetBrains Mono, monospace',glow:true,line:'#2FA7B5',fresh:'#8FE2D4',chalk:'#DAD4BE',lo:'#3B6F73',hi:'#8FE2D4',w:1.6},
+ B:{name:'Oceanic phosphor cartography',ui:'Bitstream Charter, Charter, serif',promptStyle:'font-family:Bitstream Charter,serif;font-style:italic;',line:'#2FA7B5',fresh:'#8FE2D4',chalk:'#DAD4BE',lo:'#3B6F73',hi:'#8FE2D4',w:1.4},
+ C:{name:'Photochemical negative-print sound atlas',ui:'Inter, sans-serif',line:'#DAD4BE',fresh:'#8FE2D4',chalk:'#DAD4BE',lo:'#3B6F73',hi:'#DAD4BE',w:1.3}
+};
+
+function defs(k){return `<defs>
+<filter id="glow${k}" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<filter id="grain${k}"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7" result="n"/><feColorMatrix type="matrix" values="0 0 0 0 .85  0 0 0 0 .83  0 0 0 0 .75  0 0 0 .9 -.32"/></filter>
+<radialGradient id="bg${k}" cx="50%" cy="50%" r="75%"><stop offset="0" stop-color="#0C2230"/><stop offset=".55" stop-color="#07131C"/><stop offset="1" stop-color="#050e15"/></radialGradient>
+<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#07131C" stop-opacity="0"/><stop offset=".22" stop-color="#07131C" stop-opacity=".92"/><stop offset="1" stop-color="#07131C" stop-opacity=".95"/></linearGradient><pattern id="scan${k}" width="4" height="3" patternUnits="userSpaceOnUse"><rect width="4" height="1" fill="#000" opacity=".28"/></pattern>
+</defs>`;}
+
+function wordmark(th,k,x,y,s){
+ const L=[ 'M56 0H8V80H56M8 38H44', 'M54 17C42 -5 6 -2 6 40C6 82 42 85 54 63', 'M8 0V80M50 0V80M8 52H50', 'M28 0C10 0 6 20 6 40C6 60 10 80 28 80C46 80 50 60 50 40C50 20 46 0 28 0Z'];
+ const off=[0,70,140,210];
+ const layers=k==='C'?[[26,'#3B6F73',0,0],[21,'#07131C',0,0],[15,'#DAD4BE',0,0],[11,'#07131C',0,0],[6,'#2FA7B5',4,-3]]
+  :k==='B'?[[26,'#2FA7B5',0,0],[22,'#07131C',0,0],[17,'#3B6F73',0,0],[13,'#07131C',0,0],[6,'#8FE2D4',0,0]]
+  :[[24,'#3B6F73',0,0],[20,'#07131C',0,0],[15,'#2FA7B5',0,0],[11,'#07131C',0,0],[5,'#8FE2D4',0,0]];
+ let o='';for(const [w,c,dx,dy] of layers){o+=`<g stroke="${c}" stroke-width="${w}" fill="none" stroke-linejoin="round" stroke-linecap="butt" transform="translate(${dx} ${dy})">`+L.map((d,i)=>`<path transform="translate(${off[i]} 0)" d="${d}"/>`).join('')+`</g>`;}
+ return `<g transform="translate(${x} ${y}) scale(${s})" ${k==='A'?`filter="url(#glow${k})"`:''}>${o}</g>`;}
+
+function render(k,scn){
+ const th=themes[k];th.glow=k==='A';
+ const sc=compute(JSON.parse(JSON.stringify(scenes[scn])));
+ sc.fields=sc.pings.map(p=>field(p.o[0],p.o[1]));
+ // recompute edges using fresh structure (JSON clone dropped nothing needed)
+ const tmp=compute(scenes[scn]);Object.assign(sc,tmp);
+ const dim=scn==='title'?.38:1;
+ let out=`<svg xmlns="http://www.w3.org/2000/svg" width="${PW}" height="${PH}" viewBox="0 0 ${PW} ${PH}">${defs(k).replace(/id="glow"/,'')}`;
+ out+=`<rect width="${PW}" height="${PH}" fill="url(#bg${k})"/>`;
+ // theme background furniture
+ if(k==='A'){let gr='';for(let x=0;x<=PW;x+=65)gr+=`M${x} 0V${PH}`;for(let y=0;y<=PH;y+=65)gr+=`M0 ${y}H${PW}`;out+=`<path d="${gr}" stroke="#2FA7B5" stroke-opacity=".09" stroke-width="1" fill="none"/>`;
+   let tk='';for(let x=0;x<=PW;x+=13)tk+=`M${x} 417v10`;for(let y=0;y<=PH;y+=13)tk+=`M190 ${y}h10`;out+=`<path d="${tk}" stroke="#2FA7B5" stroke-opacity=".22" fill="none"/>`;}
+ // floor treatments for reached cells
+ const fr=sc.pings[0],F=sc.fields[0];
+ if(k==='B'&&scn!=='title'){ // iso-cost contour bands + soundings
+   let iso='',snd='';const band=1.35;
+   for(let j=1;j<NY-1;j++)for(let i=1;i<NX-1;i++){const c=F[j*NX+i];if(c===Infinity||c>sc.front)continue;const b=Math.floor(c/band);
+     const r=F[j*NX+i+1],d=F[(j+1)*NX+i];
+     if(r!==Infinity&&r<=sc.front&&Math.floor(r/band)!==b){const x=(i+1)*S,y=j*S;iso+=`M${f1(sx(x))} ${f1(sy(y))}L${f1(sx(x))} ${f1(sy(y+S))}`;}
+     if(d!==Infinity&&d<=sc.front&&Math.floor(d/band)!==b){const x=i*S,y=(j+1)*S;iso+=`M${f1(sx(x))} ${f1(sy(y))}L${f1(sx(x+S))} ${f1(sy(y))}`;}
+     if(i%18===4&&j%18===4){snd+=`<text x="${f1(sx(i*S))}" y="${f1(sy(j*S))}" font-size="10" fill="#8FE2D4" opacity="${(.55*Math.max(.2,1-c/sc.front)).toFixed(2)}" style="font-family:Bitstream Charter,serif;font-style:italic">${Math.round(c)}</text>`;}}
+   out+=`<path d="${iso}" stroke="#2FA7B5" stroke-opacity=".5" stroke-width="1" fill="none"/>${snd}`;
+ }
+ if(k==='C'&&scn!=='title'){ // halftone dot screen on reached floor
+   let dots='';for(let j=0;j<NY;j+=4)for(let i=((j/4)%2)*2;i<NX;i+=4){const c=F[j*NX+i];if(c===Infinity||c>sc.front)continue;const t=sc.pings[0].age-c/9;const v=g(t)*en(c);if(v<.05)continue;
+     dots+=`<circle cx="${f1(sx((i+.5)*S))}" cy="${f1(sy((j+.5)*S))}" r="${(.4+1.55*v*v).toFixed(2)}"/>`;}
+   out+=`<g fill="#8FE2D4" opacity=".5">${dots}</g>`;
+ }
+ // wall contours
+ const o=bucketPaths(sc.E.filter(e=>true),{lo:th.lo,hi:th.hi,w:th.w});
+ const hachure=k==='B'?(()=>{let d='';sc.E.forEach((e,n)=>{if(n%3||e.I<.12)return;const mx=(e.x1+e.x2)/2,my=(e.y1+e.y2)/2;d+=`M${f1(sx(mx))} ${f1(sy(my))}l${(e.nx*5).toFixed(1)} ${(-e.ny*5).toFixed(1)}`;});return `<path d="${d}" stroke="#3B6F73" stroke-opacity=".75" stroke-width=".9" fill="none"/>`;})():'';
+ out+=`<g opacity="${dim}">`;
+ if(k==='C')out+=`<g transform="translate(2.4 -1.8)" opacity=".85"><g style="mix-blend-mode:screen">${bucketPaths(sc.E,{lo:'#1d6a78',hi:'#2FA7B5',w:th.w})}</g></g>${o}`;
+ else if(k==='A')out+=`<g filter="url(#glow${k})">${o}</g>`;
+ else out+=hachure+o;
+ // wavefront
+ if(scn!=='title'){let wf='',wa='';const lo=sc.front-.2,hi=sc.front+.2;
+   for(let j=0;j<NY;j+=1)for(let i=0;i<NX;i+=1){const c=F[j*NX+i];if(c<lo||c>hi)continue;
+     const p=sc.pred?Math.hypot((i+.5)*S-sc.pred[0],(j+.5)*S-sc.pred[1]):99;const x=f1(sx((i+.5)*S)),y=f1(sy((j+.5)*S));
+     const r=(1+1.4*en(c)).toFixed(2);
+     const dot=`<circle cx="${x}" cy="${y}" r="${k==='C'?(1.2+1.3*en(c)).toFixed(2):r}"/>`;
+     if(p<3.4)wa+=dot;else wf+=dot;}
+   const col=k==='C'?'#DAD4BE':'#8FE2D4';
+   out+=`<g fill="${col}" ${k==='A'?`filter="url(#glow${k})"`:''}>${wf}</g><g fill="#EFC17A">${wa}</g>`;}
+ out+=`</g>`;
+ // predator, pursuer mark
+ out+=predator(sc,{glow:k==='A'}).replace('filter="url(#glow)"',`filter="url(#glow${k})"`);
+ out+=pursuerMark(sc);
+ // player glyph + halo
+ const px=sx(sc.px),py=sy(sc.py);
+ out+=`<circle cx="${px}" cy="${py}" r="20" fill="none" stroke="#DAD4BE" stroke-opacity=".16" stroke-dasharray="2 5"/>`+glyph(px,py-3,'#DAD4BE',1.15);
+ // hidden exit hint: none (not discovered)
+ // overlays
+ if(k==='A')out+=`<rect width="${PW}" height="${PH}" fill="url(#scan${k})" opacity=".5"/><rect x="1" y="1" width="${PW-2}" height="${PH-2}" rx="32" fill="none" stroke="#2FA7B5" stroke-opacity=".22"/>`;
+ if(k==='C'){out+=`<rect width="${PW}" height="${PH}" filter="url(#grain${k})" opacity=".22"/>`;
+   for(const [x,y] of [[16,16],[PW-16,16],[16,PH-16],[PW-16,PH-16]])out+=`<path d="M${x-8} ${y}H${x+8}M${x} ${y-8}V${y+8}" stroke="#DAD4BE" stroke-opacity=".5" stroke-width="1"/><circle cx="${x}" cy="${y}" r="4.5" fill="none" stroke="#DAD4BE" stroke-opacity=".5"/>`;
+   out+=`<text transform="translate(12 ${PH/2}) rotate(-90)" text-anchor="middle" font-size="9" fill="#DAD4BE" opacity=".4" style="font-family:JetBrains Mono,monospace;letter-spacing:.14em">ECHO 400   ▸ 07   07A   ▸ 08</text>`;}
+ if(k==='B'){out+=`<rect x="10" y="10" width="${PW-20}" height="${PH-20}" rx="26" fill="none" stroke="#3B6F73" stroke-opacity=".4"/>`;
+   let t='';for(let a=0;a<=PW-40;a+=13)t+=`M${20+a} 10v${a%65?4:8}`;out+=`<path d="${t}" stroke="#3B6F73" stroke-opacity=".6" fill="none"/>`;}
+ // readouts
+ if(scn!=='title'){
+  if(k==='A')out+=`<text x="${PW-22}" y="76" text-anchor="end" font-size="11" fill="#2FA7B5" style="font-family:JetBrains Mono,monospace">T+${sc.pings[0].age.toFixed(2)}s  r ${sc.front.toFixed(1)}m</text><text x="${PW-22}" y="92" text-anchor="end" font-size="11" fill="#3B6F73" style="font-family:JetBrains Mono,monospace">CH1  DIV 5m</text>`;
+  if(k==='B')out+=`<text x="${PW-24}" y="76" text-anchor="end" font-size="12" fill="#8FE2D4" opacity=".75" style="font-family:Bitstream Charter,serif;font-style:italic">soundings in metres</text><text x="${PW-24}" y="93" text-anchor="end" font-size="12" fill="#8FE2D4" opacity=".5" style="font-family:Bitstream Charter,serif;font-style:italic">interval 1.35</text>`;
+  if(k==='C')out+=`<text x="${PW-24}" y="76" text-anchor="end" font-size="11" fill="#DAD4BE" opacity=".6" style="font-family:JetBrains Mono,monospace">exposure ${sc.pings[0].age.toFixed(1)}s</text>`;
+  out+=hud(sc,th);
+ } else {
+  const col=k==='C'?'#DAD4BE':'#8FE2D4';
+  out+=wordmark(th,k,66,226,.75);
+  out+=`<text x="195" y="360" text-anchor="middle" font-size="${k==='B'?18:17}" fill="#DAD4BE" style="${k==='B'?'font-family:Bitstream Charter,serif;font-style:italic':k==='A'?'font-family:JetBrains Mono,monospace;font-size:14px':'font-family:Inter Display,Inter,sans-serif;font-weight:300;letter-spacing:.02em'}">Can you find a way without seeing?</text>`;
+  out+=`<g><rect x="125" y="752" width="140" height="48" rx="${k==='C'?4:24}" fill="none" stroke="${col}" stroke-opacity=".8" stroke-width="1.4"/><text x="195" y="782" text-anchor="middle" font-size="16" fill="${col}" style="font-family:${th.ui}">Begin</text></g>`;
+  out+=`<text x="195" y="822" text-anchor="middle" font-size="12" fill="#DAD4BE" opacity=".45" style="font-family:${th.ui}">Best with sound. Fully playable without.</text>`;
+ }
+ return out+'</svg>';
+}
+
+// ---------- page ----------
+const desc={
+ A:'The pulse as an instrument trace. Fixed graticule, scan lines, a small readout of time and range. Wave and walls glow like phosphor on glass. Most legible, most familiar. The risk is that it reads as a sci-fi HUD.',
+ B:'The pulse as a survey. Cost contours at fixed intervals inside the wave, soundings in metres, and hachure ticks on struck walls. Quiet and scholarly. It turns the acoustic cost field, the game’s real mechanic, into the picture.',
+ C:'The pulse as a printed exposure. Walls double-exposed with a misregistered cyan plate, the wave as a halftone screen, film edge-code and registration marks. Most distinctive. It carries the highest cost for contrast and for the halftone shader.'
+};
+const names={title:'Title',reveal:'Echo cast, 0.85s after',threat:'Threat heard, old echo fading'};
+const root=document.getElementById('root');
+for(const k of ['A','B','C']){
+ const row=document.createElement('div');row.className='row';row.id='row'+k;
+ row.innerHTML=`<h2>${k}. ${themes[k].name}</h2><p>${desc[k]}</p><div class="phones">`+['title','reveal','threat'].map(s=>`<div class="col"><div class="phone" id="p${k}${s}">${render(k,s)}</div><div class="cap">${names[s]}</div></div>`).join('')+`</div>`;
+ root.appendChild(row);
+}
+</script></body></html>
