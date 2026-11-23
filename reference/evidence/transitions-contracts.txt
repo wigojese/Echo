@@ -1,0 +1,20 @@
+PASS  T4 starts when a creature or heard echo is newly drawn
+PASS  T6 starts at the alert and the edge stays steady afterwards
+MEASURE T1 wordmark + T2 opening breath: 60 frames, worst luminance swing in any second 2.43 percent of white, biggest frame to frame step 0.31, brightest pixel 225/255, render+raster p50 4.50 ms p95 7.20 ms
+MEASURE T3 cast aperture and front: 24 frames, worst luminance swing in any second 0.00 percent of white, biggest frame to frame step 0.00, brightest pixel 224/255, render+raster p50 3.10 ms p95 4.90 ms
+MEASURE T4 known-contact nudge: 48 frames, worst luminance swing in any second 0.19 percent of white, biggest frame to frame step 0.06, brightest pixel 224/255, render+raster p50 6.60 ms p95 8.20 ms
+MEASURE T6 threat encounter (1.5 s): 90 frames, worst luminance swing in any second 0.44 percent of white, biggest frame to frame step 0.16, brightest pixel 224/255, render+raster p50 5.00 ms p95 6.90 ms
+MEASURE T7 failure dim then reveal: 64 frames, worst luminance swing in any second 2.38 percent of white, biggest frame to frame step 2.32, brightest pixel 224/255, render+raster p50 4.20 ms p95 5.90 ms
+MEASURE T8 success reconstruction: 50 frames, worst luminance swing in any second 0.31 percent of white, biggest frame to frame step 0.06, brightest pixel 224/255, render+raster p50 3.40 ms p95 3.60 ms
+MEASURE T5 memory pullback: 30 frames, worst luminance swing in any second 0.26 percent of white, biggest frame to frame step 0.14, brightest pixel 224/255, render+raster p50 3.90 ms p95 5.30 ms
+PASS  F1 no transition swings the screen luminance by anything near a general flash (limit 10 percent of white in any second)  worst 2.43 percent
+PASS  F2 no transition ever draws a pure-white pop: the brightest pixel stays at palette chalk or below (235 of 255)  brightest 225
+PASS  F3 the strongest single frame-to-frame change is under 5 percent of white  worst 2.32 percent
+PASS  X1 before Reveal the failure screen is byte-identical even if the hidden listener route is tampered with
+PASS  X2 after Reveal the route is drawn, so the tampered and untampered pictures differ (the test can fail)
+PASS  X3 the threat edge is non-positional: moving the listener 3 m in the simulation changes no pixel
+PASS  I1 Echo pressed in the middle of the threat transition casts on the next tick
+PASS  R1 reduced motion: the wordmark is drawn and stays exactly where it is while it fades  box 92,85-300,155 then 92,85-299,155
+PASS  R2 normal motion: the wordmark visibly travels and shrinks (so R1 is not trivial)  width 208 then -1000
+PASS  O1 within 0.2 s of Begin the player is already moving, while the opening breath is still playing  moved 0.30 m, camera INTRO_DROP
+RESULT 12 passed, 0 failed

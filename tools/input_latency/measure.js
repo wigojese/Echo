@@ -34,11 +34,13 @@ const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length 
       await touch('touchStart', [{ x: 80, y: 600, id: 1 }]); await touch('touchMove', [{ x: 80, y: 552, id: 1 }]); await sleep(120); await touch('touchStart', [{ x: 80, y: 552, id: 1 }, { x: ECHO.x, y: ECHO.y, id: 2 }]); await sleep(300); await touch('touchEnd', []); const y1 = await p.evaluate(() => window.__g.sim.pos[1]); const c1 = await casts(); e2 = `moved ${(y1 - y0).toFixed(2)} m while ${c1} echo(es) sent`; }
     say(`MODE ${mode}: A deliberate Echo taps pinged ${a}/50 | B world-to-Echo drags pinged ${bb}/50 (want 0) | C stray taps near Echo pinged ${c}/50 (want 0) | D interrupted presses pinged ${d}/20 (want 0) | E two fingers: ${e2}`);
   }
-  // Input to cast latency: touchStart on Echo to the frame in which the sim has processed the cast
-  await reset('waypoint'); await sleep(300); await p.evaluate(() => { window.__lat.length = 0; });
-  for (let i = 0; i < 100; i++) { await noCool(); await touch('touchStart', [ECHO]); await sleep(30); await touch('touchEnd', []); await sleep(30); }
-  const lat = await p.evaluate(() => window.__lat);
-  say(`LATENCY touch-down on Echo to the render frame that includes the cast: n=${lat.length} p50=${pct(lat, .5).toFixed(1)} ms p95=${pct(lat, .95).toFixed(1)} ms max=${Math.max(...lat).toFixed(1)} ms (headless, event dispatch to rAF callback)`);
+  // Input to cast latency. Timing between taps is jittered so the test does not phase-lock to the 30 Hz tick,
+  // and three separate runs are reported because separate browser sessions of the same build differed by about 15 ms.
+  const runs = [];
+  for (let r = 0; r < 3; r++) { await reset('waypoint'); await sleep(300); await p.evaluate(() => { window.__lat.length = 0; });
+    for (let i = 0; i < 60; i++) { await noCool(); await touch('touchStart', [ECHO]); await sleep(30); await touch('touchEnd', []); await sleep(37 + (i % 7)); }
+    const lat = await p.evaluate(() => window.__lat); runs.push({ p50: pct(lat, .5), p95: pct(lat, .95), min: Math.min(...lat), n: lat.length }); }
+  say(`LATENCY touch-down on Echo to the render frame that includes the cast, 3 runs of 60 with jittered timing: p50 ${runs.map((x) => x.p50.toFixed(1)).join(' / ')} ms, p95 ${runs.map((x) => x.p95.toFixed(1)).join(' / ')} ms, fastest ${Math.min(...runs.map((x) => x.min)).toFixed(1)} ms (headless, event dispatch to rAF callback, runs inside one session agree closely, but separate browser sessions of the same build differed by about 15 ms)`);
   // Frame pacing of the page itself over 4 s
   const fr = await p.evaluate(() => new Promise((res) => { const d = []; let l = performance.now(); const f = (n) => { d.push(n - l); l = n; if (d.length < 240) requestAnimationFrame(f); else res(d.slice(5)); }; requestAnimationFrame(f); }));
   say(`FRAMES headless rAF interval: p50=${pct(fr, .5).toFixed(1)} ms p95=${pct(fr, .95).toFixed(1)} ms p99=${pct(fr, .99).toFixed(1)} ms (software rendering, server CPU)`);

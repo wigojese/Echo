@@ -35,12 +35,12 @@
     if (opts.underlay) opts.underlay(ctx);
     // ---- wall faces by age ----
     const G = new Map(), halo = [], fringe = []; let nseg = 0;
-    const add = (key, st, x1, y1, x2, y2) => { let b = G.get(key); if (!b) { b = { st, d: [] }; G.set(key, b); } b.d.push(x1, y1, x2, y2); };
+    const oa = opts.openingAlpha ?? 1; let curOpen = false; const add = (key, st, x1, y1, x2, y2) => { key = (curOpen ? 'o' : '') + key; let b = G.get(key); if (!b) { b = { st: curOpen ? { ...st, open: true } : st, d: [] }; G.set(key, b); } b.d.push(x1, y1, x2, y2); };
     for (const s of snap.segments) {
-      const t = s.ageTicks / 30, x1 = sx(s.p[0]), y1 = sy(s.p[1]), x2 = sx(s.p[2]), y2 = sy(s.p[3]); nseg++;
+      curOpen = s.castId === 0; const t = s.ageTicks / 30, x1 = sx(s.p[0]), y1 = sy(s.p[1]), x2 = sx(s.p[2]), y2 = sy(s.p[3]); nseg++;
       const nxp = s.n[0], nyp = -s.n[1]; // inward normal in screen space
-      if (t < 0.35) { ids.push(s.id); add('f', { col: C.fresh, w: 2.3 * ss, a: 1, dash: null }, x1, y1, x2, y2); if (!mem) { halo.push([x1, y1, x2, y2, nxp, nyp, 1]); fringe.push([x1, y1, x2, y2, nxp, nyp, 0.55]); } }
-      else if (t < 1.4) { const u = (t - 0.35) / 1.05; ids.push(s.id); add('a' + Math.round(u * 5), { col: mix(C.fresh, C.glow, u), w: (1.9 - 0.3 * u) * ss, a: 0.95, dash: null }, x1, y1, x2, y2); if (u < 0.5 && !mem) { halo.push([x1, y1, x2, y2, nxp, nyp, 0.5 * (1 - u * 2)]); fringe.push([x1, y1, x2, y2, nxp, nyp, 0.4 * (1 - u * 2)]); } }
+      if (t < 0.35) { ids.push(s.id); add('f', { col: C.fresh, w: 2.3 * ss, a: 1, dash: null }, x1, y1, x2, y2); if (!mem) { halo.push([x1, y1, x2, y2, nxp, nyp, curOpen ? oa : 1]); fringe.push([x1, y1, x2, y2, nxp, nyp, 0.55 * (curOpen ? oa : 1)]); } }
+      else if (t < 1.4) { const u = (t - 0.35) / 1.05; ids.push(s.id); add('a' + Math.round(u * 5), { col: mix(C.fresh, C.glow, u), w: (1.9 - 0.3 * u) * ss, a: 0.95, dash: null }, x1, y1, x2, y2); if (u < 0.5 && !mem) { halo.push([x1, y1, x2, y2, nxp, nyp, 0.5 * (1 - u * 2) * (curOpen ? oa : 1)]); fringe.push([x1, y1, x2, y2, nxp, nyp, 0.4 * (1 - u * 2) * (curOpen ? oa : 1)]); } }
       else if (t < 8) { const u = (t - 1.4) / 6.6, keep = 1 - 0.92 * Math.pow(u, 1.15), mx = (s.p[0] + s.p[2]) / 2, my = (s.p[1] + s.p[3]) / 2;
         if (hash(Math.floor(mx / 0.9) + s.n[0] * 7, Math.floor(my / 0.9) + s.n[1] * 5) > keep) continue;
         const col = u < 0.5 ? mix(C.glow, C.mem, u * 2) : mix(C.mem, C.res, (u - 0.5) * 2), q = Math.round(u * 8);
@@ -51,7 +51,7 @@
     const naive = !!opts.naiveHalo, hw = naive ? 5 * bloom : Math.min(26, 5 * bloom), ha = Math.min(0.9, 0.22 * bloom), off = naive ? 0 : hw / 2; // naive = deliberately wrong control used by the tests
     if (bloom > 0 && halo.length) { ctx.strokeStyle = C.fresh; ctx.lineWidth = hw; ctx.lineCap = 'butt'; for (const h of halo) { ctx.globalAlpha = ha * h[6]; ctx.beginPath(); ctx.moveTo(h[0] + h[4] * off, h[1] + h[5] * off); ctx.lineTo(h[2] + h[4] * off, h[3] + h[5] * off); ctx.stroke(); } ctx.globalAlpha = 1; ctx.lineCap = 'round'; }
     ctx.strokeStyle = C.fresh; ctx.lineWidth = 1.1; ctx.setLineDash([2, 3]); for (const f of fringe) { ctx.globalAlpha = f[6]; ctx.beginPath(); ctx.moveTo(f[0] + f[4] * 2.2, f[1] + f[5] * 2.2); ctx.lineTo(f[2] + f[4] * 2.2, f[3] + f[5] * 2.2); ctx.stroke(); } ctx.setLineDash([]); ctx.globalAlpha = 1;
-    for (const b of G.values()) { ctx.strokeStyle = b.st.col; ctx.lineWidth = b.st.w; ctx.globalAlpha = b.st.a; ctx.lineCap = b.st.dash ? 'butt' : 'round'; ctx.setLineDash(b.st.dash || []); ctx.beginPath(); for (let i = 0; i < b.d.length; i += 4) { ctx.moveTo(b.d[i], b.d[i + 1]); ctx.lineTo(b.d[i + 2], b.d[i + 3]); } ctx.stroke(); }
+    for (const b of G.values()) { ctx.strokeStyle = b.st.col; ctx.lineWidth = b.st.w; ctx.globalAlpha = b.st.a * (b.st.open ? oa : 1); ctx.lineCap = b.st.dash ? 'butt' : 'round'; ctx.setLineDash(b.st.dash || []); ctx.beginPath(); for (let i = 0; i < b.d.length; i += 4) { ctx.moveTo(b.d[i], b.d[i + 1]); ctx.lineTo(b.d[i + 2], b.d[i + 3]); } ctx.stroke(); }
     ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.lineCap = 'round';
     // ---- incident front: a broken pressure seam along the cells the wave is touching now ----
     for (const w of (mem ? [] : snap.waves)) { ctx.strokeStyle = C.fresh; ctx.lineWidth = 2.6; for (const q of w.pts) { const x = sx(q[0]), y = sy(q[1]), tx = q[2], ty = -q[3]; ctx.globalAlpha = 0.55 + 0.4 * q[4]; ctx.beginPath(); ctx.moveTo(x - tx * 3.6, y - ty * 3.6); ctx.lineTo(x + tx * 3.6, y + ty * 3.6); ctx.stroke(); } ctx.globalAlpha = 1; }

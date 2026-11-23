@@ -42,6 +42,6 @@ Nothing here ran in Godot, and nothing was tried on a phone.
 
 ## Found and fixed while building
 
-- My first graybox rewrite built the full snapshot twice per frame. Touch-to-cast latency rose from 30.7 ms to 61.7 ms. A lighter per-frame snapshot brought it to 36.4 ms (p50, headless Chromium).
+- My first graybox rewrite built the full snapshot twice per frame, and the audit seemed to show touch-to-cast latency doubling and then recovering after I lightened it. **That story is not reliable.** I later found the audit's fixed sleeps phase-locked to the 30 Hz tick, and with jittered timing the same build measures anywhere from about 37 to 53 ms at p50 between runs. The lighter per-frame snapshot is still a sensible change, but I cannot claim it fixed a measured regression.
 - Both the camera module and the driver declared a global `SCREEN`, which broke the page until I renamed one.
 - Frame-capture script errors (stale input state, a chip drawn over the level title) were fixed.

@@ -11,10 +11,10 @@ PASS  C5 the Echo label has at least 4.5:1 contrast against its button  14.9:1
 PASS  C6 the grain is world-anchored: it moves with the world, not the screen  error after the matching shift x=0.000 y=0.000, error with no shift 0.44
 PASS  C7 budgets over a full run: at most 200 particles, 1,500 contour segments, 2 overlapping waves  max particles 30, max segments 451, max waves 1
 PASS  C7b pinging as fast as the cooldown allows: never more than 2 waves, 200 particles or 1,500 segments  waves 2, particles 17, segments 196
-PERF render() plus raster flush, headless Chromium software rendering on a server CPU, replay B at tick 520 (not a phone): graybox p50 0.60 ms p95 0.80 ms | plate p50 3.40 ms p95 4.50 ms | delta p50 2.80 ms
+PERF render() plus raster flush, headless Chromium software rendering on a server CPU, replay B at tick 520 (not a phone): graybox p50 0.40 ms p95 0.50 ms | plate p50 3.40 ms p95 3.90 ms | delta p50 3.00 ms
 PASS  C8 close view (zoom 1.60): every lit pixel is next to something the player knows  band close, lit samples 257, unexplained 0, segments drawn 148
 PASS  C8 active view (zoom 1.00): every lit pixel is next to something the player knows  band active, lit samples 226, unexplained 0, segments drawn 148
 PASS  C8 memory view (zoom 0.70): every lit pixel is next to something the player knows  band memory, lit samples 132, unexplained 0, segments drawn 148
 PASS  C8b all three views draw the same set of known wall faces at the same tick  148 / 148 / 148
-PASS  C8c negative control: one bright line drawn where nothing is known is caught by the same check  unexplained lit samples 81
+PASS  C8c negative control: one bright line drawn where nothing is known is caught by the same check  unexplained lit samples 80
 RESULT 18 passed, 0 failed

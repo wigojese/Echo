@@ -27,6 +27,9 @@ var _active_casts: Array[Dictionary] = []
 var _path_cache: Dictionary = {}
 var _exit_ticks: int = 0
 var trail: Array[Vector2] = []
+var run_casts: Array[Dictionary] = []
+var pred_route: Array = []
+var _alert_start: int = -1
 var _exit_pos: Vector2 = Vector2.ZERO
 
 
@@ -62,6 +65,9 @@ func reset(first: bool = false) -> void:
     motion.position = Vector2(spawn[0], spawn[1])
     trail.clear()
     trail.append(motion.position)
+    run_casts.clear()
+    pred_route.clear()
+    _alert_start = -1
     var exit_xy: Array = level["goal"]["exit_xy"]
     _exit_pos = Vector2(exit_xy[0], exit_xy[1])
     predators.clear()
@@ -73,6 +79,7 @@ func reset(first: bool = false) -> void:
             agent.waypoints.append(Vector2(w[0], w[1]))
         agent.hearing_limit = float(p.get("hearing_cost_limit_m", AcousticFieldSolver.HEARING_LIMIT))
         predators.append(agent)
+        pred_route.append([[agent.position.x, agent.position.y, 0]])
     var opening: float = float(level["rules"].get("opening_breath_m", 0.0))
     if opening > 0.0:
         var f := AcousticFieldSolver.solve(grid, motion.position, opening)
@@ -115,6 +122,16 @@ func step(inputs: Array = []) -> void:
         pr.step(t, grid, motion.position, _path_field, bus)
         if pr.captured and state == &"RUNNING":
             state = &"CAPTURED"
+    var chasing := false
+    for i in range(predators.size()):
+        if predators[i].state == &"CHASE":
+            chasing = true
+        if t % 15 == 0 or state != &"RUNNING":
+            (pred_route[i] as Array).append([predators[i].position.x, predators[i].position.y, t])
+    if chasing and _alert_start < 0:
+        _alert_start = t
+    elif not chasing:
+        _alert_start = -1
     if state == &"RUNNING":
         _check_exit(t)
     if state == &"RUNNING" and t + 1 >= TIMEOUT_TICKS:
@@ -145,6 +162,8 @@ func snapshot() -> VisibleWorldSnapshot:
     var snap := KnowledgeGate.build(motion.position, knowledge, _exit_pos, tick, {"nx": grid.nx, "ny": grid.ny, "cell": grid.cell})
     snap.waves = _waves(tick)
     snap.trail = trail.duplicate()
+    if _alert_start >= 0 and state == &"RUNNING":
+        snap.alert = {"age_ticks": tick - _alert_start}
     return snap
 
 
@@ -173,6 +192,7 @@ func _ping(t: int) -> void:
     last_field = field
     _active_casts.append({"cast_id": cast_id, "tick": t, "field": field})
     knowledge.record_cast(cast_id, origin, t)
+    run_casts.append({"cast_id": cast_id, "origin": origin, "tick": t})
     var count := 0
     var first := 1 << 30
     var last := -1
@@ -270,3 +290,26 @@ func _waves(t: int) -> Array:
                 pts.append([(i + 0.5) * grid.cell, (j + 0.5) * grid.cell, -gy / m, gx / m, maxf(0.0, 1.0 - v / AcousticFieldSolver.PULSE_MAX_COST)])
         out.append({"cast_id": c["cast_id"], "age_ticks": age, "points": pts})
     return out
+
+
+## Post-round only. While the round is running this returns an empty dictionary, so the view layer
+## cannot ask for hidden truth.
+func reveal_truth() -> Dictionary:
+    if state == &"RUNNING" or predators.is_empty():
+        return {}
+    var pr: PredatorAgent = predators[0]
+    return {
+        "route": pred_route[0].duplicate(),
+        "last_heard_origin": pr.last_heard_origin if pr.has_heard else null,
+        "last_heard_tick": pr.last_heard_tick,
+        "heard_cast_ids": pr.heard_cast_ids.duplicate(),
+        "predator_final": pr.position,
+        "player_final": motion.position,
+    }
+
+
+## Post-round only: every echo you cast and the full route you walked.
+func summary() -> Dictionary:
+    if state == &"RUNNING":
+        return {}
+    return {"casts": run_casts.duplicate(), "trail": trail.duplicate(), "end": motion.position, "exit": _exit_pos, "outcome": state}

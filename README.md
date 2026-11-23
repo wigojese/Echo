@@ -7,6 +7,7 @@ Portrait mobile stealth-navigation game. A finger-launched sonic pulse reveals s
 - `game/` Godot project modules, `tests/` runners, `tools/` validator and firewall scanner
 - `reference/` Node reference simulation, playable browser graybox (`reference/graybox/index.html`), replays, evidence images
 - `reference/graybox/plate_world.js` the D renderer, `tools/render_contracts/` pixel contracts and captures
+- `reference/transitions/` the eight signature transitions, `tools/transitions/` filmstrips, recordings and the generated `docs/TRANSITIONS.md`
 - `reference/camera/` camera director: follow, manual reframe, TRACE path scroll, zoom bands
 - `reference/input/` touch router and waypoint planner for both control schemes
 - `spike/stage06/` engine-neutral acoustic solver reference and tests (`node spike/stage06/tests.js`)

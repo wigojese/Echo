@@ -9,6 +9,7 @@ var memory_segments: Array[Dictionary] = []  # {a, b, age_ticks, cast_id}
 var cast_origins: Array[Dictionary] = []  # {origin, age_ticks, cast_id}
 var threat_ghosts: Array[Dictionary] = []  # {position, age_ticks, direct}
 var known_exit: Variant = null  # Vector2 once legitimately sensed, otherwise null
+var alert: Variant = null  # {age_ticks} while a listener is chasing. Never a position
 var trail: Array = []  # Vector2 points where the player has actually walked
 var waves: Array = []  # [{cast_id, age_ticks, points: [[x, y, tx, ty, energy]]}] cells the wave is touching now
 var known_cells: Array = []  # [cell_id, age_ticks] open floor the player has sensed

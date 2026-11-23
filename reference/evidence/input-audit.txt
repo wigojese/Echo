@@ -1,5 +1,5 @@
 AUDIT emulated touch, headless Chromium 157.0.8103.78, 390x844 CSS px, dsf 2. Not a phone.
 MODE waypoint: A deliberate Echo taps pinged 50/50 | B world-to-Echo drags pinged 0/50 (want 0) | C stray taps near Echo pinged 0/50 (want 0) | D interrupted presses pinged 0/20 (want 0) | E two fingers: n/a
 MODE joystick: A deliberate Echo taps pinged 50/50 | B world-to-Echo drags pinged 0/50 (want 0) | C stray taps near Echo pinged 0/50 (want 0) | D interrupted presses pinged 0/20 (want 0) | E two fingers: moved 0.70 m while 1 echo(es) sent
-LATENCY touch-down on Echo to the render frame that includes the cast: n=100 p50=27.8 ms p95=29.3 ms max=46.1 ms (headless, event dispatch to rAF callback)
+LATENCY touch-down on Echo to the render frame that includes the cast, 3 runs of 60 with jittered timing: p50 34.4 / 33.9 / 35.8 ms, p95 50.6 / 45.7 / 61.1 ms, fastest 17.7 ms (headless, event dispatch to rAF callback, runs inside one session agree closely, but separate browser sessions of the same build differed by about 15 ms)
 FRAMES headless rAF interval: p50=16.7 ms p95=16.8 ms p99=16.8 ms (software rendering, server CPU)

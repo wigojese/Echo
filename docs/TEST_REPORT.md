@@ -11,13 +11,15 @@ Updated 2026-11-23. Host: v22.23.5, Intel(R) Xeon(R) Processor @ 2.30GHz, linux/
 | Input router, planner and control modes, 30 tests | IMPLEMENTED/TESTED |
 | Camera director, 20 tests | IMPLEMENTED/TESTED |
 | Gesture conflicts, 20 tests | IMPLEMENTED/TESTED |
+| Transitions, 22 tests | IMPLEMENTED/TESTED |
 | Level validator, firewall scanner, style tokens, 17 checks | IMPLEMENTED/TESTED |
 | Pixel-level render contracts, 18 checks (browser, software rendering) | IMPLEMENTED/TESTED, **not Godot** |
+| Rendered-frame transition contracts, 12 checks (browser) | IMPLEMENTED/TESTED, **not Godot** |
 | Emulated touch audit and input timing (headless Chromium) | EMULATED, not a phone |
-| GDScript syntax, 21 files, gdtoolkit 4.5.0 | IMPLEMENTED/TESTED, **syntax only** |
+| GDScript syntax, 22 files, gdtoolkit 4.5.0 | IMPLEMENTED/TESTED, **syntax only** |
 | GDScript unit tests in `tests/run_tests.gd` | **BLOCKED/UNVERIFIED**, never run |
 | Engine-rendered screenshots, shaders, in-engine recording | **BLOCKED**, no Godot |
-| Finger comfort, real pinch and scrub feel, daylight legibility | **BLOCKED/UNVERIFIED**, no device |
+| Haptics, real sound, finger feel, real-screen flash safety and brightness | **BLOCKED/UNVERIFIED**, no device |
 
 Manual test to close the Godot gap, on a machine with Godot 4.7:
 
@@ -42,8 +44,8 @@ PASS  determinism: two runs give bit-identical cost fields
 PASS  hearing: ping at the fork is heard by the listener  cost=7.93 m, arrives 0.88 s after cast
 PASS  hearing: ping at spawn is not heard  cost=Infinity
 PASS  origin: field is rooted at the cast position (cost 0 there, 3.5 m to where the player went)  cost to later position=3.50
-BENCH L01 at 0.25 m cells: p50=0.492 ms  p95=0.816 ms  max=0.963 ms  (n=300, cells=13824)
-BENCH L01 at 0.20 m cells: p50=0.704 ms  p95=1.022 ms  max=1.110 ms  (n=300, cells=21600)
+BENCH L01 at 0.25 m cells: p50=0.446 ms  p95=0.687 ms  max=1.052 ms  (n=300, cells=13824)
+BENCH L01 at 0.20 m cells: p50=0.751 ms  p95=1.096 ms  max=1.445 ms  (n=300, cells=21600)
 
 HOST node v22.23.5, Intel(R) Xeon(R) Processor @ 2.30GHz, 4 logical CPUs, linux/x64
 RESULT 13 passed, 0 failed
@@ -58,7 +60,7 @@ PASS  validator rejects an exit inside a wall  Exit (8,3) is inside a wall.
 PASS  validator rejects a sealed exit  Exit (20,32) is sealed: no connected walkable route from spawn.
 PASS  validator rejects a spawn inside a wall  Spawn (8,3) is inside a wall or lacks 0.28 m clearance.
 PASS  validator rejects corridors narrower than 0.65 m  Corridor width 0.60 m is below the 0.65 m minimum.
-PASS  firewall passes on the real repository  FIREWALL scanned 5 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
+PASS  firewall passes on the real repository  FIREWALL scanned 6 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
 PASS  firewall catches a camera script that reads WorldTruth and predators  exit=1
 PASS  tokens: no blue, teal or cyan hue in the palette
 PASS  tokens: paper_chalk has at least 4.5:1 text contrast on plate black  14.8:1
@@ -87,7 +89,7 @@ PASS  10 one ping from spawn does not reveal the exit
 PASS  11 static memory fully expires within 8 s of the last contact
 PASS  12 a creature is remembered only as a ghost that is gone within 1.25 s
 PASS  12b the ghost stays where the creature was, never at its current position
-PASS  13 the snapshot exposes no predator field  tick,player,segments,cells,grid,castOrigins,waves,trail,ghosts,knownExit
+PASS  13 the snapshot exposes no predator field  tick,player,segments,cells,grid,castOrigins,waves,trail,alert,ghosts,knownExit
 PASS  14 a ping at the fork is heard at the computed weighted cost and delay  cost=8.786, delay=30 ticks
 PASS  15 a ping at spawn is never heard
 PASS  16 moving after the ping: the listener goes to the old origin, not to the player  player is 5.2 m from the origin
@@ -192,6 +194,33 @@ PASS  G18 left-handed layout: Echo, Quiet, TRACE, Recenter and Pause hit areas n
 RESULT 20 passed, 0 failed
 ```
 
+### `node tests/js/stage12.test.js`
+```
+PASS  01 all 8 transitions have start, end, keyframes, easing, trigger, midpoint, sound and haptic pairing, skip, reduced-motion replacement, fallback and clock  8 of 8 complete
+PASS  02 durations match the baseline: 480, 350 to 600, 55 to 85, 120 to 220, 350, 120, 500, at most 650  T1 480, T2 450, T3 70, T4 180, T5 350, T6 120, T7 500, T8 650
+PASS  03 every transition cancels cleanly at 0, 25, 50, 75 and 100 percent: finite values, snaps to its end or rest, and stays there  40 cases
+PASS  04 Begin and the result replay can be skipped within one frame (limit 150 ms)
+PASS  05 reduced motion: no scaling, drift, zoom or flicker, only a 120 ms fade, and the camera nudge is off
+PASS  06 repeated threat alerts every 100 ms never flash more than once a second (limit 3), at most 35 percent amplitude  accepted 5 of 50, worst flashes in any second 1, peak 0.35
+PASS  07 during the threat zoom the touch mapping stays exact and the view never closes in by more than 8 percent  worst mapping error 2.0e-15 m, peak zoom 1.080
+PASS  08 before anything is revealed there is nothing to nudge toward, whatever the hidden listener is doing
+PASS  09 once a creature or heard echo is drawn, the nudge points at that drawn shape and drifts at most 0.2 of the viewport  first target at tick 538, direction 0.38,-0.93, drift 29,156 px
+PASS  10 the alert carries only its age, never a position
+PASS  11 the warning starts at least 0.60 s before a capture can happen  warning 56 ticks = 1.87 s
+PASS  12 the real listener route is refused for every tick of the round and offered only after it ends  route points 49
+PASS  13 failure: the scene dims on its own, but the real route is drawn only after the explicit Reveal
+PASS  14 success: the replay uses only your own run (2 echoes, the route you walked) and the line draws entry to exit then retracts  ink at half time 0.42
+PASS  15 the transitions never change the simulation: the event log is identical with and without them
+PASS  16 the origin scar is on the plate in the first snapshot after the cast (at most one tick old), and every front sample sits within 0.1 m of the solver front  scar age 1 tick, 291 samples, worst 0.1000 m
+PASS  17 the transition director costs under 0.05 ms per frame  0.42 microseconds per frame, Node 22
+PASS  18 the pullback pushes in to 1.05, then pulls to 0.72 without overshoot or a jump  peak 1.050, end 0.720, biggest step 0.050
+PASS  19 steering ends the opening breath at once, and the wordmark transition runs only the first time
+PASS  20 each transition emits its sound and haptic pairing the moment it starts
+PASS  21 with the threat zoom and the camera nudge on, touch still maps to the world exactly (500 random cameras)  worst error 7.3e-15 m
+PASS  22 docs/TRANSITIONS.md matches the specs in the code exactly  run `node tools/transitions/gen_docs.js --write` after changing a spec
+RESULT 22 passed, 0 failed
+```
+
 ### `cat reference/evidence/render-contracts.txt`
 ```
 PASS  C1 sealed wall, normal bloom: the far corridor stays dark  far max luminance 27, bright pixels 0
@@ -207,13 +236,37 @@ PASS  C5 the Echo label has at least 4.5:1 contrast against its button  14.9:1
 PASS  C6 the grain is world-anchored: it moves with the world, not the screen  error after the matching shift x=0.000 y=0.000, error with no shift 0.44
 PASS  C7 budgets over a full run: at most 200 particles, 1,500 contour segments, 2 overlapping waves  max particles 30, max segments 451, max waves 1
 PASS  C7b pinging as fast as the cooldown allows: never more than 2 waves, 200 particles or 1,500 segments  waves 2, particles 17, segments 196
-PERF render() plus raster flush, headless Chromium software rendering on a server CPU, replay B at tick 520 (not a phone): graybox p50 0.60 ms p95 0.80 ms | plate p50 3.40 ms p95 4.50 ms | delta p50 2.80 ms
+PERF render() plus raster flush, headless Chromium software rendering on a server CPU, replay B at tick 520 (not a phone): graybox p50 0.40 ms p95 0.50 ms | plate p50 3.40 ms p95 3.90 ms | delta p50 3.00 ms
 PASS  C8 close view (zoom 1.60): every lit pixel is next to something the player knows  band close, lit samples 257, unexplained 0, segments drawn 148
 PASS  C8 active view (zoom 1.00): every lit pixel is next to something the player knows  band active, lit samples 226, unexplained 0, segments drawn 148
 PASS  C8 memory view (zoom 0.70): every lit pixel is next to something the player knows  band memory, lit samples 132, unexplained 0, segments drawn 148
 PASS  C8b all three views draw the same set of known wall faces at the same tick  148 / 148 / 148
-PASS  C8c negative control: one bright line drawn where nothing is known is caught by the same check  unexplained lit samples 81
+PASS  C8c negative control: one bright line drawn where nothing is known is caught by the same check  unexplained lit samples 80
 RESULT 18 passed, 0 failed
+```
+
+### `cat reference/evidence/transitions-contracts.txt`
+```
+PASS  T4 starts when a creature or heard echo is newly drawn
+PASS  T6 starts at the alert and the edge stays steady afterwards
+MEASURE T1 wordmark + T2 opening breath: 60 frames, worst luminance swing in any second 2.43 percent of white, biggest frame to frame step 0.31, brightest pixel 225/255, render+raster p50 4.50 ms p95 7.20 ms
+MEASURE T3 cast aperture and front: 24 frames, worst luminance swing in any second 0.00 percent of white, biggest frame to frame step 0.00, brightest pixel 224/255, render+raster p50 3.10 ms p95 4.90 ms
+MEASURE T4 known-contact nudge: 48 frames, worst luminance swing in any second 0.19 percent of white, biggest frame to frame step 0.06, brightest pixel 224/255, render+raster p50 6.60 ms p95 8.20 ms
+MEASURE T6 threat encounter (1.5 s): 90 frames, worst luminance swing in any second 0.44 percent of white, biggest frame to frame step 0.16, brightest pixel 224/255, render+raster p50 5.00 ms p95 6.90 ms
+MEASURE T7 failure dim then reveal: 64 frames, worst luminance swing in any second 2.38 percent of white, biggest frame to frame step 2.32, brightest pixel 224/255, render+raster p50 4.20 ms p95 5.90 ms
+MEASURE T8 success reconstruction: 50 frames, worst luminance swing in any second 0.31 percent of white, biggest frame to frame step 0.06, brightest pixel 224/255, render+raster p50 3.40 ms p95 3.60 ms
+MEASURE T5 memory pullback: 30 frames, worst luminance swing in any second 0.26 percent of white, biggest frame to frame step 0.14, brightest pixel 224/255, render+raster p50 3.90 ms p95 5.30 ms
+PASS  F1 no transition swings the screen luminance by anything near a general flash (limit 10 percent of white in any second)  worst 2.43 percent
+PASS  F2 no transition ever draws a pure-white pop: the brightest pixel stays at palette chalk or below (235 of 255)  brightest 225
+PASS  F3 the strongest single frame-to-frame change is under 5 percent of white  worst 2.32 percent
+PASS  X1 before Reveal the failure screen is byte-identical even if the hidden listener route is tampered with
+PASS  X2 after Reveal the route is drawn, so the tampered and untampered pictures differ (the test can fail)
+PASS  X3 the threat edge is non-positional: moving the listener 3 m in the simulation changes no pixel
+PASS  I1 Echo pressed in the middle of the threat transition casts on the next tick
+PASS  R1 reduced motion: the wordmark is drawn and stays exactly where it is while it fades  box 92,85-300,155 then 92,85-299,155
+PASS  R2 normal motion: the wordmark visibly travels and shrinks (so R1 is not trivial)  width 208 then -1000
+PASS  O1 within 0.2 s of Begin the player is already moving, while the opening breath is still playing  moved 0.30 m, camera INTRO_DROP
+RESULT 12 passed, 0 failed
 ```
 
 ### `cat reference/evidence/input-audit.txt`
@@ -221,13 +274,13 @@ RESULT 18 passed, 0 failed
 AUDIT emulated touch, headless Chromium 157.0.8103.78, 390x844 CSS px, dsf 2. Not a phone.
 MODE waypoint: A deliberate Echo taps pinged 50/50 | B world-to-Echo drags pinged 0/50 (want 0) | C stray taps near Echo pinged 0/50 (want 0) | D interrupted presses pinged 0/20 (want 0) | E two fingers: n/a
 MODE joystick: A deliberate Echo taps pinged 50/50 | B world-to-Echo drags pinged 0/50 (want 0) | C stray taps near Echo pinged 0/50 (want 0) | D interrupted presses pinged 0/20 (want 0) | E two fingers: moved 0.70 m while 1 echo(es) sent
-LATENCY touch-down on Echo to the render frame that includes the cast: n=100 p50=27.8 ms p95=29.3 ms max=46.1 ms (headless, event dispatch to rAF callback)
+LATENCY touch-down on Echo to the render frame that includes the cast, 3 runs of 60 with jittered timing: p50 34.4 / 33.9 / 35.8 ms, p95 50.6 / 45.7 / 61.1 ms, fastest 17.7 ms (headless, event dispatch to rAF callback, runs inside one session agree closely, but separate browser sessions of the same build differed by about 15 ms)
 FRAMES headless rAF interval: p50=16.7 ms p95=16.8 ms p99=16.8 ms (software rendering, server CPU)
 ```
 
 ### `node tools/check_firewall.js`
 ```
-FIREWALL scanned 5 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
+FIREWALL scanned 6 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
 FIREWALL OK: no view-layer script references ground truth
 ```
 
@@ -258,5 +311,6 @@ parsed ok  game/scripts/player/motion_controller.gd
 parsed ok  game/scripts/predator/predator_agent.gd
 parsed ok  game/scripts/rendering/pulse_renderer.gd
 parsed ok  game/scripts/rendering/style_tokens.gd
+parsed ok  game/scripts/rendering/transitions.gd
 parsed ok  tests/run_tests.gd
 ```

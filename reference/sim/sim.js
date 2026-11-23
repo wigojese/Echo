@@ -51,7 +51,7 @@ class Sim {
     this.pos = [...L.player.spawn_xy]; this.vel = [0, 0]; this.dir = [0, 0]; this.quiet = false;
     this.nextPingTick = 0; this.castCount = 0; this.pathLen = 0; this.exitTicks = 0;
     this.events = []; this.scheduled = new Map(); this.casts = [];
-    this.trail = [[...L.player.spawn_xy]]; this.casts = []; this.mem = new Map(); this.cellMem = new Map(); this.ghosts = new Map(); this.castOrigins = []; this.exitKnown = false;
+    this.trail = [[...L.player.spawn_xy]]; this.runCasts = []; this.predRoute = (L.predators || []).map((p) => [[p.spawn_xy[0], p.spawn_xy[1], 0]]); this.alertStart = -1; this.casts = []; this.mem = new Map(); this.cellMem = new Map(); this.ghosts = new Map(); this.castOrigins = []; this.exitKnown = false;
     this.lastField = null;
     this.pred = (L.predators || []).map((p) => ({ id: p.id, pos: [...p.spawn_xy], wp: p.patrol_waypoints, wpIdx: 1, state: 'PATROL',
       dest: null, lastHeardOrigin: null, lastHeardTick: -1, lastSeenPlayerTick: -1, investigationCount: 0, heardCastIds: [],
@@ -91,6 +91,8 @@ class Sim {
     this.scheduled.delete(t);
     this.updateKnowledge(t);
     for (const p of this.pred) this.stepPredator(p, t);
+    this.pred.forEach((p, i) => { if (t % 15 === 0 || this.state !== 'RUNNING') this.predRoute[i].push([+p.pos[0].toFixed(3), +p.pos[1].toFixed(3), t]); if (this.predRoute[i].length > 400) this.predRoute[i].shift(); });
+    const chasing = this.pred.some((p) => p.state === 'CHASE'); if (chasing && this.alertStart < 0) this.alertStart = t; else if (!chasing) this.alertStart = -1;
     if (this.state === 'RUNNING') this.checkExit(t);
     if (this.state === 'RUNNING' && t + 1 >= P.timeoutTicks) { this.state = 'TIMEOUT'; this.emit('level_timeout', {}); }
     this.tick++;
@@ -117,7 +119,7 @@ class Sim {
     this.nextPingTick = t + P.cooldownTicks;
     const field = S.field(this.grid, origin[0], origin[1], S.PULSE_MAX_COST);
     this.lastField = { castId, origin, tick: t, field };
-    this.casts.push({ castId, tick: t, origin, field });
+    this.casts.push({ castId, tick: t, origin, field }); this.runCasts.push({ castId, origin: [...origin], tick: t });
     this.castOrigins.push({ castId, origin, tick: t, heardTick: -1 });
     // wave contacts: wall faces become known when the front reaches the adjacent cell
     let first = Infinity, last = -Infinity, count = 0;
@@ -211,6 +213,7 @@ class Sim {
     return { tick: t, player: [...this.pos], segments: segs, cells, grid: { nx: this.grid.nx, ny: this.grid.ny, cell: this.grid.cell },
       castOrigins: this.castOrigins.map((c) => ({ castId: c.castId, origin: [...c.origin], ageTicks: t - c.tick, heardAgeTicks: c.heardTick < 0 ? null : t - c.heardTick })),
       waves: this.waves(t), trail: this.trail.map((p) => [...p]),
+      alert: this.alertStart >= 0 && this.state === 'RUNNING' ? { ageTicks: t - this.alertStart } : null,
       ghosts: [...this.ghosts.values()].map((g) => ({ pos: [...g.pos], ageTicks: t - g.tick })),
       knownExit: this.exitKnown ? [...this.level.goal.exit_xy] : null };
   }
@@ -227,6 +230,19 @@ class Sim {
     }
     return out;
   }
+
+  // Cheap view for the trigger watcher: only what it needs, with no wave, cell or wall data.
+  watchSnapshot() { const t = this.tick; return { tick: t, player: [...this.pos], ghosts: [...this.ghosts.values()].map((g) => ({ pos: [...g.pos], ageTicks: t - g.tick })),
+    castOrigins: this.castOrigins.map((c) => ({ castId: c.castId, origin: [...c.origin], ageTicks: t - c.tick, heardAgeTicks: c.heardTick < 0 ? null : t - c.heardTick })), alert: this.alertStart >= 0 && this.state === 'RUNNING' ? { ageTicks: t - this.alertStart } : null }; }
+
+  // Post-round only. While the round is running this returns null, so the view layer cannot ask for hidden truth.
+  revealTruth() {
+    if (this.state === 'RUNNING') return null;
+    const cap = this.events.find((e) => e.kind === 'player_captured'), pr = this.pred[0]; if (!pr) return null;
+    return { route: this.predRoute[0].map((p) => [p[0], p[1]]), lastHeardOrigin: pr.lastHeardOrigin ? [...pr.lastHeardOrigin] : null, lastHeardTick: pr.lastHeardTick, heardCastIds: [...pr.heardCastIds], predatorFinal: [...pr.pos], playerFinal: [...this.pos], captured: !!cap, alertTicks: cap ? cap.payload.alertTicks : null };
+  }
+  // Post-round only. Your own run: every echo you cast and the full route you walked.
+  summary() { if (this.state === 'RUNNING') return null; return { casts: this.runCasts.map((c) => ({ castId: c.castId, origin: [...c.origin], tick: c.tick })), trail: this.trail.map((p) => [...p]), end: [...this.pos], exit: [...this.level.goal.exit_xy], outcome: this.state }; }
 
   // Explanation built only from the event log.
   explain() {

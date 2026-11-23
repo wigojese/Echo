@@ -39,30 +39,34 @@ function buildPath(wps, r = 0.6, step = 0.25) {
 
 class CameraDirector {
   constructor(o = {}) {
-    this.reducedMotion = !!o.reducedMotion; this.zoom = 1; this.band = 'active'; this.off = [0, 0]; this.steering = false; this.fade = 0; this.anim = null; this.trace = null; this.traceOff = [0, 0]; this.state = 'LISTENER_FOLLOW';
+    this.reducedMotion = !!o.reducedMotion; this.zoom = 1; this.band = 'active'; this.off = [0, 0]; this.steering = false; this.fade = 0; this.anim = null; this.trace = null; this.traceOff = [0, 0]; this.state = 'LISTENER_FOLLOW'; this.zm = 1; this.nudge = [0, 0];
     if (o.intro !== false) { this.zoom = 1.25; this.state = 'INTRO_DROP'; this.begin({ zoom: 1.0 }, TIMES.intro, 'intro'); }
   }
-  get K() { return Z.base * this.zoom; }
+  get K() { return Z.base * this.zoom * this.zm; }
+  // Transient view effects (threat zoom, known-contact nudge). They never change the real zoom, the band or the offsets.
+  setTransient(o = {}) { this.zm = o.zoomMul ?? 1; this.nudge = o.nudge ?? [0, 0]; }
+  startIntro() { if (this.reducedMotion) { this.zoom = 1; this.state = 'LISTENER_FOLLOW'; this.fade = 1; this.anim = { t: 0, dur: TIMES.fade, kind: 'fade' }; return; } this.zoom = 1.25; this.state = 'INTRO_DROP'; this.begin({ zoom: 1.0 }, TIMES.intro, 'intro'); }
   // ---- transitions ----
   begin(to, dur, kind) {
     const from = { zoom: this.zoom, off: [...this.off], toff: [...this.traceOff], s: this.trace ? this.trace.s : 0 };
     if (this.reducedMotion) { this.apply({ ...from, ...to }, 1); this.fade = 1; this.anim = { t: 0, dur: TIMES.fade, kind: 'fade', done: to.done }; this.finish(kind); return; }
     this.anim = { t: 0, dur, kind, from, to }; }
-  apply(st, e) { // interpolate from this.anim.from to a target
+  apply(st, e, raw) { // interpolate from this.anim.from to a target
     const f = this.anim && this.anim.from ? this.anim.from : st, t = st;
-    this.zoom = lerp(f.zoom, t.zoom ?? f.zoom, e); if (t.off) this.off = [lerp(f.off[0], t.off[0], e), lerp(f.off[1], t.off[1], e)]; if (t.toff) this.traceOff = [lerp(f.toff[0], t.toff[0], e), lerp(f.toff[1], t.toff[1], e)]; if (t.s !== undefined && this.trace) this.trace.s = lerp(f.s, t.s, e); this.band = nextBand(this.band, this.zoom); }
+    if (this.anim && this.anim.kind === 'pullback' && raw !== undefined) this.zoom = raw < 0.15 ? lerp(f.zoom, 1.05, ease(raw / 0.15)) : lerp(1.05, t.zoom, ease((raw - 0.15) / 0.85)); // small push-in, then the pullback
+    else this.zoom = lerp(f.zoom, t.zoom ?? f.zoom, e); if (t.off) this.off = [lerp(f.off[0], t.off[0], e), lerp(f.off[1], t.off[1], e)]; if (t.toff) this.traceOff = [lerp(f.toff[0], t.toff[0], e), lerp(f.toff[1], t.toff[1], e)]; if (t.s !== undefined && this.trace) this.trace.s = lerp(f.s, t.s, e); this.band = nextBand(this.band, this.zoom); }
   finish(kind) { if (kind === 'intro') this.state = 'LISTENER_FOLLOW'; else if (kind === 'return') { this.state = 'LISTENER_FOLLOW'; this.trace = null; this.off = [0, 0]; this.traceOff = [0, 0]; } }
   tick(dtMs) {
     if (this.release_) { const r = this.release_; r.t += dtMs; const k = Math.max(0, 1 - r.t / TIMES.release); if (this.trace) this.trace.s = clamp(this.trace.s + r.v * (dtMs / 1000) * k, 0, this.trace.L); if (r.t >= TIMES.release) { this.release_ = null; if (this.trace) this.trace.vel = 0; } }
     if (!this.anim) return; const a = this.anim; a.t += dtMs;
     if (a.kind === 'fade') { this.fade = Math.max(0, 1 - a.t / a.dur); if (a.t >= a.dur) { this.fade = 0; this.anim = null; } return; }
-    const e = ease(clamp(a.t / a.dur, 0, 1)); this.apply(a.to, e); if (a.t >= a.dur) { const k = a.kind; this.anim = null; this.finish(k); } }
+    const raw = clamp(a.t / a.dur, 0, 1), e = ease(raw); this.apply(a.to, e, raw); if (a.t >= a.dur) { const k = a.kind; this.anim = null; this.finish(k); } }
   // ---- inputs ----
-  steer(active) { this.steering = !!active; if (active && this.state === 'MANUAL_REFRAME') this.returnToListener(); }
+  steer(active) { this.steering = !!active; if (active && this.state === 'INTRO_DROP') { this.anim = null; this.state = 'LISTENER_FOLLOW'; this.zoom = 1; } if (active && this.state === 'MANUAL_REFRAME') this.returnToListener(); }
   pinch(anchor, ratio) {
     if (this.state === 'INTRO_DROP') { this.anim = null; this.state = 'LISTENER_FOLLOW'; this.zoom = 1; }
     if (this.anim && this.anim.kind === 'return') return; const before = this.zoom, nz = clamp(before * ratio, Z.min, Z.max); if (nz === before) return;
-    const a = this.steering && this.state !== 'KNOWN_PATH_SCROLL' ? { x: CAMSCREEN.W / 2, y: PY } : anchor, c = this.center(this.snap_), K0 = Z.base * before, K1 = Z.base * nz;
+    const a = this.steering && this.state !== 'KNOWN_PATH_SCROLL' ? { x: CAMSCREEN.W / 2, y: PY } : anchor, c = this.center(this.snap_), K0 = Z.base * before * this.zm, K1 = Z.base * nz * this.zm;
     const wx = c[0] + (a.x - CAMSCREEN.W / 2) / K0, wy = c[1] - (a.y - PY) / K0; this.zoom = nz; this.band = nextBand(this.band, nz);
     const cx = wx - (a.x - CAMSCREEN.W / 2) / K1, cy = wy + (a.y - PY) / K1;
     if (this.state === 'KNOWN_PATH_SCROLL') { const p = this.pathPoint(); this.traceOff = [cx - p[0], cy - p[1]]; }
@@ -83,7 +87,7 @@ class CameraDirector {
     this.release_ = null; this.begin(to, TIMES.recenter, 'return'); }
   // ---- read ----
   pathPoint() { const t = this.trace, s = clamp(t.s, 0, t.L), pts = t.path.pts; let lo = 0, hi = pts.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (pts[m][2] < s) lo = m; else hi = m; } const a = pts[lo], b = pts[hi], u = (s - a[2]) / ((b[2] - a[2]) || 1); return [lerp(a[0], b[0], u), lerp(a[1], b[1], u)]; }
-  center(snap) { this.snap_ = snap || this.snap_; if (this.state === 'KNOWN_PATH_SCROLL' && this.trace) { const p = this.pathPoint(); return [p[0] + this.traceOff[0], p[1] + this.traceOff[1]]; } const pl = this.snap_.player; return [pl[0] + this.off[0], pl[1] + this.off[1]]; }
+  center(snap) { this.snap_ = snap || this.snap_; if (this.state === 'KNOWN_PATH_SCROLL' && this.trace) { const p = this.pathPoint(); return [p[0] + this.traceOff[0], p[1] + this.traceOff[1]]; } const pl = this.snap_.player, n = this.state === 'LISTENER_FOLLOW' ? this.nudge : [0, 0]; return [pl[0] + this.off[0] + n[0], pl[1] + this.off[1] + n[1]]; }
   frame(snap) {
     const c = this.center(snap), K = this.K, tf = { worldToScreen: (w) => ({ x: CAMSCREEN.W / 2 + (w[0] - c[0]) * K, y: PY - (w[1] - c[1]) * K }), screenToWorld: (p) => [c[0] + (p.x - CAMSCREEN.W / 2) / K, c[1] - (p.y - PY) / K] };
     const ps = tf.worldToScreen(snap.player), m = 24, inside = ps.x >= m && ps.x <= CAMSCREEN.W - m && ps.y >= m && ps.y <= CAMSCREEN.H - m;

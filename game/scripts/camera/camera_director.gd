@@ -26,6 +26,8 @@ var band: StringName = &"active"
 var offset: Vector2 = Vector2.ZERO
 var trace_offset: Vector2 = Vector2.ZERO
 var steering: bool = false
+var zoom_mul: float = 1.0  # transient view effect, never changes the real zoom or band
+var nudge: Vector2 = Vector2.ZERO  # transient known-contact drift, world metres
 var fade: float = 0.0
 var reduced_motion: bool = false
 var trace: Dictionary = {}
@@ -42,8 +44,25 @@ func _init(with_intro: bool = false, reduced: bool = false) -> void:
         _begin({"zoom": 1.0}, T_INTRO, &"intro")
 
 
+func start_intro() -> void:
+    if reduced_motion:
+        zoom = 1.0
+        state = &"LISTENER_FOLLOW"
+        fade = 1.0
+        _anim = {"t": 0.0, "dur": T_FADE, "kind": &"fade"}
+        return
+    zoom = 1.25
+    state = &"INTRO_DROP"
+    _begin({"zoom": 1.0}, T_INTRO, &"intro")
+
+
+func set_transient(zmul: float, n: Vector2) -> void:
+    zoom_mul = zmul
+    nudge = n
+
+
 func px_per_m() -> float:
-    return BASE_PX * zoom
+    return BASE_PX * zoom * zoom_mul
 
 
 static func next_band(b: StringName, z: float) -> StringName:
@@ -133,6 +152,10 @@ func trace_available(snap: VisibleWorldSnapshot) -> bool:
 
 func steer(active: bool) -> void:
     steering = active
+    if active and state == &"INTRO_DROP":
+        _anim = {}
+        state = &"LISTENER_FOLLOW"
+        zoom = 1.0
     if active and state == &"MANUAL_REFRAME":
         return_to_listener()
 
@@ -153,10 +176,10 @@ func pinch(anchor: Vector2, ratio: float, snap: VisibleWorldSnapshot) -> void:
     if steering and state != &"KNOWN_PATH_SCROLL":
         a = SCREEN / 2.0
     var c := _center()
-    var w := screen_to_world(a, c, BASE_PX * before)
+    var w := screen_to_world(a, c, BASE_PX * before * zoom_mul)
     zoom = nz
     band = next_band(band, nz)
-    var nc := w - Vector2((a.x - SCREEN.x / 2.0) / (BASE_PX * nz), -(a.y - SCREEN.y / 2.0) / (BASE_PX * nz))
+    var nc := w - Vector2((a.x - SCREEN.x / 2.0) / (BASE_PX * nz * zoom_mul), -(a.y - SCREEN.y / 2.0) / (BASE_PX * nz * zoom_mul))
     if state == &"KNOWN_PATH_SCROLL":
         trace_offset = nc - _path_point()
     else:
@@ -242,8 +265,8 @@ func tick(dt_ms: float) -> void:
             fade = 0.0
             _anim = {}
         return
-    var e := _ease(clampf(float(_anim["t"]) / float(_anim["dur"]), 0.0, 1.0))
-    _apply(_anim["to"], e)
+    var raw := clampf(float(_anim["t"]) / float(_anim["dur"]), 0.0, 1.0)
+    _apply(_anim["to"], _ease(raw), raw)
     if _anim["t"] >= _anim["dur"]:
         var kind: StringName = _anim["kind"]
         _anim = {}
@@ -287,9 +310,16 @@ func _apply_direct(to: Dictionary) -> void:
     band = next_band(band, zoom)
 
 
-func _apply(to: Dictionary, e: float) -> void:
+func _apply(to: Dictionary, e: float, raw: float = -1.0) -> void:
     var from: Dictionary = _anim["from"]
-    zoom = lerpf(float(from["zoom"]), float(to.get("zoom", from["zoom"])), e)
+    if _anim["kind"] == &"pullback" and raw >= 0.0:
+        # a small push-in to 1.05, then the pullback
+        if raw < 0.15:
+            zoom = lerpf(float(from["zoom"]), 1.05, _ease(raw / 0.15))
+        else:
+            zoom = lerpf(1.05, float(to["zoom"]), _ease((raw - 0.15) / 0.85))
+    else:
+        zoom = lerpf(float(from["zoom"]), float(to.get("zoom", from["zoom"])), e)
     if to.has("offset"):
         offset = (from["offset"] as Vector2).lerp(to["offset"], e)
     band = next_band(band, zoom)
@@ -325,7 +355,8 @@ func _path_point() -> Vector2:
 func _center() -> Vector2:
     if state == &"KNOWN_PATH_SCROLL" and not trace.is_empty():
         return _path_point() + trace_offset
-    return _snap.player_position + offset
+    var n := nudge if state == &"LISTENER_FOLLOW" else Vector2.ZERO
+    return _snap.player_position + offset + n
 
 
 static func _ease(t: float) -> float:

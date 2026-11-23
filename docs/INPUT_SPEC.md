@@ -56,7 +56,7 @@ From `reference/evidence/input-audit.txt`:
 - 50 deliberate Echo taps with 20 px jitter: 50 of 50 pinged, in both modes.
 - 50 drags from the world onto Echo: 0 pinged. 50 stray taps 58 to 78 px from Echo: 0 pinged. 20 interrupted presses: 0 pinged.
 - Joystick mode with two fingers: 0.70 m moved while 1 echo was sent.
-- Touch-down to the render frame with the cast: p50 30.7 ms, p95 47.4 ms, max 49.0 ms over 100 trials. Most of this is the 30 Hz tick, which can add up to 33 ms.
+- Touch-down to the render frame with the cast: roughly 35 to 55 ms at p50 and 45 to 67 ms at p95, depending on the run. **Run-to-run spread is about 15 ms,** so no build-to-build difference in this stage is established. Most of the delay is the 30 Hz tick (up to 33 ms) plus a frame. The first version of this audit used fixed sleeps that phase-locked to the tick and reported a misleadingly tight 30.7 ms.
 - Page frame interval: 16.7 ms at p50, p95 and p99. Software rendering of a trivial scene, so it says nothing about a phone.
 
 ## Known gaps

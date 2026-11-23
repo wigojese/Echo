@@ -333,3 +333,70 @@ func test_input_trace_and_pinch_gestures() -> void:
     p.pointer_up(2, Vector2(280, 400), 70.0)
     var k := _kinds(p)
     _check("input: a pinch emits zoom and never a waypoint", k.has("pinch") and not k.has("waypoint"))
+
+
+# ---- Stage 12: transitions, alert and the post-round gate, mirrors tests/js/stage12.test.js. Never run in Godot yet. ----
+
+func test_transitions_rate_limit_and_once() -> void:
+    var t := Transitions.new()
+    var accepted := 0
+    for ms in range(0, 5000, 10):
+        if ms % 100 == 0 and t.start(&"T6"):
+            accepted += 1
+        t.tick(10.0)
+    _check("transitions: repeated threat alerts every 100 ms are accepted at most once a second", accepted <= 5, str(accepted))
+    var first := Transitions.new()
+    _check("transitions: the wordmark runs only the first time", first.start(&"T1") and not first.start(&"T1"))
+
+
+func test_transitions_reduced_motion() -> void:
+    var t := Transitions.new(true)
+    _check("transitions: the camera nudge is off under reduced motion", not t.start(&"T4"))
+    t.start(&"T6")
+    t.tick(30.0)
+    var p := t.threat_params(true)
+    _check("transitions: reduced motion has no zoom and no flicker, only a steady edge", p["zoom_mul"] == 1.0 and p["flicker"] == 0.0 and p["edge"] > 0.0)
+
+
+func test_transitions_cancel_is_final() -> void:
+    var bad := 0
+    for id in Transitions.SPECS.keys():
+        for frac in [0.0, 0.25, 0.5, 0.75, 1.0]:
+            var t := Transitions.new()
+            t.start(id)
+            t.tick(t.duration(id) * frac + 0.001)
+            t.cancel(id)
+            var before := t.progress(id)
+            t.tick(500.0)
+            if absf(t.progress(id) - before) > 0.000001 and not Transitions.PERSISTENT.has(id):
+                bad += 1
+    _check("transitions: every transition cancels to a final state at 0, 25, 50, 75 and 100 percent", bad == 0, str(bad))
+
+
+func test_sim_alert_is_not_positional_and_truth_is_gated() -> void:
+    var sim := _l01()
+    var by_tick := Simulation.group_replay(_json("res://reference/replays/A_heard_and_caught.json"))
+    var alert_keys := {}
+    var refused_while_running := true
+    while sim.state == &"RUNNING" and sim.tick < 1000:
+        sim.step(by_tick.get(sim.tick, []))
+        var a: Variant = sim.snapshot().alert
+        if a != null:
+            for k in (a as Dictionary).keys():
+                alert_keys[k] = true
+        if sim.state == &"RUNNING" and not sim.reveal_truth().is_empty():
+            refused_while_running = false
+    _check("sim: the alert carries only its age", alert_keys.keys() == ["age_ticks"])
+    _check("sim: the real listener route is refused while the round runs and given after it ends", refused_while_running and not sim.reveal_truth().is_empty() and not sim.summary().is_empty())
+
+
+func test_camera_mapping_with_transient_effects() -> void:
+    var sim := _l01()
+    var snap := sim.snapshot()
+    var cam := CameraDirector.new()
+    cam.set_transient(1.08, Vector2(0.5, -0.3))
+    var f: Dictionary = cam.frame(snap)
+    var w := Vector2(7.0, 11.0)
+    var s := CameraDirector.world_to_screen(w, f["center"], cam.px_per_m())
+    var back := CameraDirector.screen_to_world(s, f["center"], cam.px_per_m())
+    _check("camera: with the threat zoom and a nudge on, touch still maps to the world exactly", back.distance_to(w) < 0.000001)
