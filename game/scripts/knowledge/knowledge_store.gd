@@ -16,11 +16,17 @@ var exit_known: bool = false
 
 
 func record_cast(cast_id: int, origin: Vector2, tick: int) -> void:
-    cast_origins.append({"origin": origin, "tick": tick, "cast_id": cast_id})
+    cast_origins.append({"origin": origin, "tick": tick, "cast_id": cast_id, "heard_tick": -1})
 
 
-func record_contact(segment_id: int, a: Vector2, b: Vector2, tick: int, cast_id: int) -> void:
-    segments[segment_id] = {"a": a, "b": b, "contact_tick": tick, "cast_id": cast_id}
+func mark_heard(cast_id: int, tick: int) -> void:
+    for c in cast_origins:
+        if c["cast_id"] == cast_id and int(c["heard_tick"]) < 0:
+            c["heard_tick"] = tick
+
+
+func record_contact(segment_id: int, a: Vector2, b: Vector2, tick: int, cast_id: int, n: Vector2 = Vector2.ZERO) -> void:
+    segments[segment_id] = {"a": a, "b": b, "contact_tick": tick, "cast_id": cast_id, "n": n}
 
 
 func record_sighting(entity_id: StringName, position: Vector2, tick: int, direct: bool) -> void:

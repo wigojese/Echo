@@ -23,6 +23,7 @@ var cast_count: int = 0
 var next_ping_tick: int = 0
 var last_field: PackedFloat64Array = PackedFloat64Array()
 var _scheduled: Dictionary = {}
+var _active_casts: Array[Dictionary] = []
 var _path_cache: Dictionary = {}
 var _exit_ticks: int = 0
 var _exit_pos: Vector2 = Vector2.ZERO
@@ -51,6 +52,7 @@ func reset(first: bool = false) -> void:
     next_ping_tick = 0
     _exit_ticks = 0
     _scheduled.clear()
+    _active_casts.clear()
     last_field = PackedFloat64Array()
     bus.clear()
     knowledge.reset()
@@ -73,7 +75,7 @@ func reset(first: bool = false) -> void:
         var f := AcousticFieldSolver.solve(grid, motion.position, opening)
         for e in edges:
             if not is_inf(f[e["cell"]]):
-                knowledge.record_contact(e["id"], e["a"], e["b"], 0, 0)
+                knowledge.record_contact(e["id"], e["a"], e["b"], 0, 0, e["n"])
         for c in range(f.size()):
             if not is_inf(f[c]):
                 knowledge.record_cell(c, 0)
@@ -101,6 +103,7 @@ func step(inputs: Array = []) -> void:
             fn.call()
         _scheduled.erase(t)
     knowledge.prune(t)
+    _active_casts = _active_casts.filter(func(c: Dictionary) -> bool: return t - int(c["tick"]) <= 50)
     for pr in predators:
         pr.step(t, grid, motion.position, _path_field, bus)
         if pr.captured and state == &"RUNNING":
@@ -132,7 +135,9 @@ static func group_replay(replay: Dictionary) -> Dictionary:
 
 
 func snapshot() -> VisibleWorldSnapshot:
-    return KnowledgeGate.build(motion.position, knowledge, _exit_pos, tick, {"nx": grid.nx, "ny": grid.ny, "cell": grid.cell})
+    var snap := KnowledgeGate.build(motion.position, knowledge, _exit_pos, tick, {"nx": grid.nx, "ny": grid.ny, "cell": grid.cell})
+    snap.waves = _waves(tick)
+    return snap
 
 
 func _schedule(at: int, fn: Callable) -> void:
@@ -158,6 +163,7 @@ func _ping(t: int) -> void:
     next_ping_tick = t + COOLDOWN_TICKS
     var field := AcousticFieldSolver.solve(grid, origin, AcousticFieldSolver.PULSE_MAX_COST)
     last_field = field
+    _active_casts.append({"cast_id": cast_id, "tick": t, "field": field})
     knowledge.record_cast(cast_id, origin, t)
     var count := 0
     var first := 1 << 30
@@ -173,7 +179,8 @@ func _ping(t: int) -> void:
         var id: int = e["id"]
         var a: Vector2 = e["a"]
         var b: Vector2 = e["b"]
-        _schedule(at, func() -> void: knowledge.record_contact(id, a, b, at, cast_id))
+        var n: Vector2 = e["n"]
+        _schedule(at, func() -> void: knowledge.record_contact(id, a, b, at, cast_id, n))
     for c in range(field.size()):
         if is_inf(field[c]):
             continue
@@ -197,7 +204,7 @@ func _ping(t: int) -> void:
         var arrive := t + ceili(pc / AcousticFieldSolver.PULSE_SPEED / SimClock.DT)
         _schedule(arrive, func() -> void: knowledge.record_sighting(pr.id, pr.position, arrive, true))
         if pc <= pr.hearing_limit:
-            _schedule(arrive, func() -> void: pr.hear(cast_id, origin, pc, arrive, bus))
+            _schedule(arrive, func() -> void: _on_heard(pr, cast_id, origin, pc, arrive))
 
 
 func _check_exit(t: int) -> void:
@@ -224,3 +231,34 @@ func explain() -> Dictionary:
     if state == &"TIMEOUT":
         return {"outcome": "timeout"}
     return {}
+
+
+func _on_heard(pr: PredatorAgent, cast_id: int, origin: Vector2, cost: float, arrive: int) -> void:
+    pr.hear(cast_id, origin, cost, arrive, bus)
+    knowledge.mark_heard(cast_id, arrive)
+
+
+## Incident front samples for the renderer: only cells the wave is touching right now.
+func _waves(t: int) -> Array:
+    var out: Array = []
+    for c in _active_casts:
+        var age: int = t - int(c["tick"])
+        var front: float = float(age) / float(SimClock.HZ) * AcousticFieldSolver.PULSE_SPEED
+        var f: PackedFloat64Array = c["field"]
+        var pts: Array = []
+        for j in range(1, grid.ny - 1):
+            for i in range(1, grid.nx - 1):
+                var k := j * grid.nx + i
+                var v: float = f[k]
+                if is_inf(v) or absf(v - front) > 0.1 or ((i >> 1) + (j >> 1)) % 3 == 0:
+                    continue
+                var gx := 0.0
+                var gy := 0.0
+                if not is_inf(f[k + 1]) and not is_inf(f[k - 1]):
+                    gx = f[k + 1] - f[k - 1]
+                if not is_inf(f[k + grid.nx]) and not is_inf(f[k - grid.nx]):
+                    gy = f[k + grid.nx] - f[k - grid.nx]
+                var m := maxf(sqrt(gx * gx + gy * gy), 0.000001)
+                pts.append([(i + 0.5) * grid.cell, (j + 0.5) * grid.cell, -gy / m, gx / m, maxf(0.0, 1.0 - v / AcousticFieldSolver.PULSE_MAX_COST)])
+        out.append({"cast_id": c["cast_id"], "age_ticks": age, "points": pts})
+    return out

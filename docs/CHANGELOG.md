@@ -20,3 +20,9 @@
 - Test changes caused by new features or test mistakes, not by sim changes: stage 08 test 20 now compares memory with a fresh start instead of expecting zero, and test 08 uses a level without the opening breath; stage 09 tap points, bot release timing and two loose assertions were corrected.
 - Found by test and fixed: waypoint routes jammed at inner corners until body clearance and a stuck guard were added.
 - Left-handed layout keeps Pause at the top right.
+
+## 2026-11-23
+- Stage 09 approved.
+- Stage 10: D renderer, snapshot additions (wall coordinates and normals, wave front, heard flag), 13 render contracts, captures, recording, GDScript `PulseRenderer`, material tokens, art bible.
+- Fixed during the stage: the sealed-wall bloom test first passed vacuously (captured after the halo faded). It now captures in the fresh phase and has a negative control. A contrast sample that included the player glyph and a render timing that skipped rasterisation were also corrected.
+- Renamed the replay B decayed frame to `plate-07-decayed-no-echo`. Added `plate-05-exit-known` with a real ping near the exit.

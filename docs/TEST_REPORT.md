@@ -1,6 +1,6 @@
 # Test report
 
-Updated 2026-11-22. Host: v22.23.5, Intel(R) Xeon(R) Processor @ 2.10GHz, linux/x64. Godot: **not installed, GDScript never executed**. No phone was used.
+Updated 2026-11-23. Host: v22.23.5, Intel(R) Xeon(R) Processor @ 2.30GHz, linux/x64. Godot: **not installed, GDScript never executed**. No phone was used.
 
 ## Status labels
 
@@ -10,11 +10,12 @@ Updated 2026-11-22. Host: v22.23.5, Intel(R) Xeon(R) Processor @ 2.10GHz, linux/
 | Reference simulation, 31 tests | IMPLEMENTED/TESTED |
 | Input router, planner and control modes, 30 tests | IMPLEMENTED/TESTED |
 | Level validator, firewall scanner, style tokens, 17 checks | IMPLEMENTED/TESTED |
+| Pixel-level render contracts for the D renderer, 13 checks (browser, software rendering) | IMPLEMENTED/TESTED, **not Godot** |
 | Emulated touch audit and input timing (headless Chromium) | EMULATED, not a phone |
-| GDScript syntax, 20 files, gdtoolkit 4.5.0 | IMPLEMENTED/TESTED, **syntax only** |
-| GDScript unit tests in `tests/run_tests.gd`, including router, planner and both replays | **BLOCKED/UNVERIFIED**, never run |
-| Finger comfort, one-hand reach, accidental-ping rate on a phone | **BLOCKED/UNVERIFIED**, no device. Script: `docs/COMFORT_TEST.md` |
-| Phone performance, frame pacing, thermals | **BLOCKED/UNVERIFIED** |
+| GDScript syntax, 21 files, gdtoolkit 4.5.0 | IMPLEMENTED/TESTED, **syntax only** |
+| GDScript unit tests in `tests/run_tests.gd` | **BLOCKED/UNVERIFIED**, never run |
+| Engine-rendered screenshots, shaders, in-engine recording | **BLOCKED**, no Godot |
+| Finger comfort and real brightness and daylight legibility on a phone | **BLOCKED/UNVERIFIED**, no device |
 
 Manual test to close the Godot gap, on a machine with Godot 4.7:
 
@@ -39,10 +40,10 @@ PASS  determinism: two runs give bit-identical cost fields
 PASS  hearing: ping at the fork is heard by the listener  cost=7.93 m, arrives 0.88 s after cast
 PASS  hearing: ping at spawn is not heard  cost=Infinity
 PASS  origin: field is rooted at the cast position (cost 0 there, 3.5 m to where the player went)  cost to later position=3.50
-BENCH L01 at 0.25 m cells: p50=0.570 ms  p95=0.854 ms  max=1.024 ms  (n=300, cells=13824)
-BENCH L01 at 0.20 m cells: p50=0.961 ms  p95=1.335 ms  max=1.747 ms  (n=300, cells=21600)
+BENCH L01 at 0.25 m cells: p50=0.455 ms  p95=0.814 ms  max=1.175 ms  (n=300, cells=13824)
+BENCH L01 at 0.20 m cells: p50=0.849 ms  p95=1.393 ms  max=2.221 ms  (n=300, cells=21600)
 
-HOST node v22.23.5, Intel(R) Xeon(R) Processor @ 2.10GHz, 4 logical CPUs, linux/x64
+HOST node v22.23.5, Intel(R) Xeon(R) Processor @ 2.30GHz, 4 logical CPUs, linux/x64
 RESULT 13 passed, 0 failed
 ```
 
@@ -55,7 +56,7 @@ PASS  validator rejects an exit inside a wall  Exit (8,3) is inside a wall.
 PASS  validator rejects a sealed exit  Exit (20,32) is sealed: no connected walkable route from spawn.
 PASS  validator rejects a spawn inside a wall  Spawn (8,3) is inside a wall or lacks 0.28 m clearance.
 PASS  validator rejects corridors narrower than 0.65 m  Corridor width 0.60 m is below the 0.65 m minimum.
-PASS  firewall passes on the real repository  FIREWALL scanned 4 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
+PASS  firewall passes on the real repository  FIREWALL scanned 5 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
 PASS  firewall catches a camera script that reads WorldTruth and predators  exit=1
 PASS  tokens: no blue, teal or cyan hue in the palette
 PASS  tokens: paper_chalk has at least 4.5:1 text contrast on plate black  14.8:1
@@ -84,7 +85,7 @@ PASS  10 one ping from spawn does not reveal the exit
 PASS  11 static memory fully expires within 8 s of the last contact
 PASS  12 a creature is remembered only as a ghost that is gone within 1.25 s
 PASS  12b the ghost stays where the creature was, never at its current position
-PASS  13 the snapshot exposes no predator field  tick,player,segments,cells,grid,castOrigins,ghosts,knownExit
+PASS  13 the snapshot exposes no predator field  tick,player,segments,cells,grid,castOrigins,waves,ghosts,knownExit
 PASS  14 a ping at the fork is heard at the computed weighted cost and delay  cost=8.786, delay=30 ticks
 PASS  15 a ping at spawn is never heard
 PASS  16 moving after the ping: the listener goes to the old origin, not to the player  player is 5.2 m from the origin
@@ -139,15 +140,23 @@ PASS  S12 you can move at the very start, inside the opening-breath chamber, bef
 RESULT 30 passed, 0 failed
 ```
 
-### `node tools/check_firewall.js`
+### `cat reference/evidence/render-contracts.txt`
 ```
-FIREWALL scanned 4 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
-FIREWALL OK: no view-layer script references ground truth
-```
-
-### `node tools/map_validator/validate.js`
-```
-LEVEL OK: EC-L01
+PASS  C1 sealed wall, normal bloom: the far corridor stays dark  far max luminance 27, bright pixels 0
+PASS  C1b sealed wall, bloom 16 (nearly three times the cap): the far corridor stays dark  far max luminance 27, bright pixels 0
+PASS  C1c heavy bloom really is brighter on the near side, so the dark far side is not trivial  bright pixels near: bloom 1 = 1747, bloom 16 = 4865
+PASS  C1d negative control: a naive halo centred on the wall at the same bloom DOES leak, so this test can fail  far bright pixels with the naive halo 2280
+PASS  C2 different hidden creature positions render byte-identical frames (16 frames compared)
+PASS  C3 a creature that has not been sensed is not drawn, and nothing near it is lit  on screen at (274,276), region max luminance 26
+PASS  C4 fresh contact has at least 3:1 contrast against the plate  13.8:1
+PASS  C4b afterglow has at least 3:1  11.4:1
+PASS  C4c verified memory has at least 3:1, residue is allowed to fade below it  fresh 13.8, memory 5.0, residue 1.8
+PASS  C5 the Echo label has at least 4.5:1 contrast against its button  14.9:1
+PASS  C6 the grain is world-anchored: it moves with the world, not the screen  error after the matching shift x=0.000 y=0.000, error with no shift 0.44
+PASS  C7 budgets over a full run: at most 200 particles, 1,500 contour segments, 2 overlapping waves  max particles 30, max segments 451, max waves 1
+PASS  C7b pinging as fast as the cooldown allows: never more than 2 waves, 200 particles or 1,500 segments  waves 2, particles 17, segments 196
+PERF render() plus raster flush, headless Chromium software rendering on a server CPU, replay B at tick 520 (not a phone): graybox p50 0.30 ms p95 0.50 ms | plate p50 3.30 ms p95 3.50 ms | delta p50 3.00 ms
+RESULT 13 passed, 0 failed
 ```
 
 ### `cat reference/evidence/input-audit.txt`
@@ -155,36 +164,19 @@ LEVEL OK: EC-L01
 AUDIT emulated touch, headless Chromium 157.0.8103.78, 390x844 CSS px, dsf 2. Not a phone.
 MODE waypoint: A deliberate Echo taps pinged 50/50 | B world-to-Echo drags pinged 0/50 (want 0) | C stray taps near Echo pinged 0/50 (want 0) | D interrupted presses pinged 0/20 (want 0) | E two fingers: n/a
 MODE joystick: A deliberate Echo taps pinged 50/50 | B world-to-Echo drags pinged 0/50 (want 0) | C stray taps near Echo pinged 0/50 (want 0) | D interrupted presses pinged 0/20 (want 0) | E two fingers: moved 0.70 m while 1 echo(es) sent
-LATENCY touch-down on Echo to the render frame that includes the cast: n=100 p50=30.7 ms p95=47.4 ms max=49.0 ms (headless, event dispatch to rAF callback)
+LATENCY touch-down on Echo to the render frame that includes the cast: n=100 p50=25.7 ms p95=28.8 ms max=31.1 ms (headless, event dispatch to rAF callback)
 FRAMES headless rAF interval: p50=16.7 ms p95=16.7 ms p99=16.8 ms (software rendering, server CPU)
 ```
 
-### `cat reference/replays/A_heard_and_caught.log.txt`
+### `node tools/check_firewall.js`
 ```
-REPLAY A_heard_and_caught: 50 inputs, ended CAPTURED at tick 701 (23.4 s), 1 echoes, path 21.4 m
-  replay reproduces the live run exactly: true
-  tick  507  ping_cast  {"castId":1,"origin":[10.99728138029907,16.820839099648836],"edges":451,"cooldownUntil":545}
-  tick  537  heard_ping  {"predator":"listener-01","castId":1,"arrivalTick":537,"weightedCost":8.786,"origin":[10.99728138029907,16.820839099648836]}
-  tick  537  predator_state_changed  {"predator":"listener-01","from":"PATROL","to":"CURIOUS","reason":"heard ping 1"}
-  tick  643  predator_state_changed  {"predator":"listener-01","from":"CURIOUS","to":"CHASE","reason":"line of sight within 4 m for 6 ticks"}
-  tick  700  player_captured  {"predator":"listener-01","alertStart":643,"alertTicks":57,"lastHeardOrigin":[10.99728138029907,16.820839099648836],"lastHeardTick":537,"heardCastIds":[1]}
-  EXPLANATION: The listener heard echo 1 at tick 537, walked to where it was cast, and found you after a 1.90 s warning.
-  predator last_heard_origin=[10.99728138029907,16.820839099648836] last_heard_tick=537 last_seen_player_tick=700 investigations=1
+FIREWALL scanned 5 view-layer script(s) in game/scripts/camera, game/scripts/rendering, game/scripts/input, game/scripts/audio
+FIREWALL OK: no view-layer script references ground truth
 ```
 
-### `cat reference/replays/B_heard_and_escaped.log.txt`
+### `node tools/map_validator/validate.js`
 ```
-REPLAY B_heard_and_escaped: 157 inputs, ended WON at tick 894 (29.8 s), 2 echoes, path 43.7 m
-  replay reproduces the live run exactly: true
-  tick   50  ping_cast  {"castId":1,"origin":[3,5.780555555738523],"edges":172,"cooldownUntil":88}
-  tick  507  ping_cast  {"castId":2,"origin":[10.99728138029907,16.82083909964883],"edges":451,"cooldownUntil":545}
-  tick  537  heard_ping  {"predator":"listener-01","castId":2,"arrivalTick":537,"weightedCost":8.786,"origin":[10.99728138029907,16.82083909964883]}
-  tick  537  predator_state_changed  {"predator":"listener-01","from":"PATROL","to":"CURIOUS","reason":"heard ping 2"}
-  tick  710  predator_state_changed  {"predator":"listener-01","from":"CURIOUS","to":"SEARCH","reason":"reached last heard origin"}
-  tick  785  predator_state_changed  {"predator":"listener-01","from":"SEARCH","to":"RECOVER","reason":"search finished"}
-  tick  893  exit_reached  {"casts":2,"ticks":893}
-  EXPLANATION: You reached the exit after 2 echoes. Echo 2 drew the listener toward where you cast it.
-  predator last_heard_origin=[10.99728138029907,16.82083909964883] last_heard_tick=537 last_seen_player_tick=-1 investigations=1
+LEVEL OK: EC-L01
 ```
 
 ### GDScript parse
@@ -207,6 +199,7 @@ parsed ok  game/scripts/knowledge/knowledge_store.gd
 parsed ok  game/scripts/knowledge/visible_world_snapshot.gd
 parsed ok  game/scripts/player/motion_controller.gd
 parsed ok  game/scripts/predator/predator_agent.gd
+parsed ok  game/scripts/rendering/pulse_renderer.gd
 parsed ok  game/scripts/rendering/style_tokens.gd
 parsed ok  tests/run_tests.gd
 ```

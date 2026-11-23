@@ -12,10 +12,11 @@ static func build(player_position: Vector2, store: KnowledgeStore, exit_position
     for id in store.segments.keys():
         var seg: Dictionary = store.segments[id]
         s.memory_segments.append(
-            {"a": seg["a"], "b": seg["b"], "age_ticks": tick - int(seg["contact_tick"]), "cast_id": seg["cast_id"]}
+            {"a": seg["a"], "b": seg["b"], "n": seg["n"], "age_ticks": tick - int(seg["contact_tick"]), "cast_id": seg["cast_id"]}
         )
     for c in store.cast_origins:
-        s.cast_origins.append({"origin": c["origin"], "age_ticks": tick - int(c["tick"]), "cast_id": c["cast_id"]})
+        var heard_age: int = -1 if int(c["heard_tick"]) < 0 else tick - int(c["heard_tick"])
+        s.cast_origins.append({"origin": c["origin"], "age_ticks": tick - int(c["tick"]), "cast_id": c["cast_id"], "heard_age_ticks": heard_age})
     for id in store.ghosts.keys():
         var g: Dictionary = store.ghosts[id]
         s.threat_ghosts.append({"position": g["position"], "age_ticks": tick - int(g["seen_tick"]), "direct": g["direct"]})

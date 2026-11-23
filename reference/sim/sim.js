@@ -20,10 +20,10 @@ function wallEdges(g) {
   const out = [], ok = (i, j) => i >= 0 && j >= 0 && i < g.nx && j < g.ny && g.walk[j * g.nx + i] === 1, c = g.cell;
   for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) {
     if (!g.walk[j * g.nx + i]) continue; const x0 = i * c, y0 = j * c, x1 = x0 + c, y1 = y0 + c, cell = j * g.nx + i;
-    if (!ok(i - 1, j)) out.push({ cell, x1: x0, y1: y0, x2: x0, y2: y1 });
-    if (!ok(i + 1, j)) out.push({ cell, x1, y1: y0, x2: x1, y2: y1 });
-    if (!ok(i, j - 1)) out.push({ cell, x1: x0, y1: y0, x2: x1, y2: y0 });
-    if (!ok(i, j + 1)) out.push({ cell, x1: x0, y1, x2: x1, y2: y1 });
+    if (!ok(i - 1, j)) out.push({ cell, x1: x0, y1: y0, x2: x0, y2: y1, nx: 1, ny: 0 });
+    if (!ok(i + 1, j)) out.push({ cell, x1, y1: y0, x2: x1, y2: y1, nx: -1, ny: 0 });
+    if (!ok(i, j - 1)) out.push({ cell, x1: x0, y1: y0, x2: x1, y2: y0, nx: 0, ny: 1 });
+    if (!ok(i, j + 1)) out.push({ cell, x1: x0, y1, x2: x1, y2: y1, nx: 0, ny: -1 });
   }
   out.forEach((e, id) => { e.id = id; });
   return out;
@@ -51,7 +51,7 @@ class Sim {
     this.pos = [...L.player.spawn_xy]; this.vel = [0, 0]; this.dir = [0, 0]; this.quiet = false;
     this.nextPingTick = 0; this.castCount = 0; this.pathLen = 0; this.exitTicks = 0;
     this.events = []; this.scheduled = new Map(); this.casts = [];
-    this.mem = new Map(); this.cellMem = new Map(); this.ghosts = new Map(); this.castOrigins = []; this.exitKnown = false;
+    this.casts = []; this.mem = new Map(); this.cellMem = new Map(); this.ghosts = new Map(); this.castOrigins = []; this.exitKnown = false;
     this.lastField = null;
     this.pred = (L.predators || []).map((p) => ({ id: p.id, pos: [...p.spawn_xy], wp: p.patrol_waypoints, wpIdx: 1, state: 'PATROL',
       dest: null, lastHeardOrigin: null, lastHeardTick: -1, lastSeenPlayerTick: -1, investigationCount: 0, heardCastIds: [],
@@ -115,7 +115,8 @@ class Sim {
     this.nextPingTick = t + P.cooldownTicks;
     const field = S.field(this.grid, origin[0], origin[1], S.PULSE_MAX_COST);
     this.lastField = { castId, origin, tick: t, field };
-    this.castOrigins.push({ castId, origin, tick: t });
+    this.casts.push({ castId, tick: t, origin, field });
+    this.castOrigins.push({ castId, origin, tick: t, heardTick: -1 });
     // wave contacts: wall faces become known when the front reaches the adjacent cell
     let first = Infinity, last = -Infinity, count = 0;
     for (const e of this.edges) { const c = field[e.cell]; if (c === Infinity) continue;
@@ -138,6 +139,7 @@ class Sim {
   }
 
   hear(pr, h) {
+    const co = this.castOrigins.find((c) => c.castId === h.castId); if (co && co.heardTick < 0) co.heardTick = h.arrival;
     pr.lastHeardOrigin = [...h.origin]; pr.lastHeardTick = h.arrival; pr.investigationCount++; pr.heardCastIds.push(h.castId);
     this.emit('heard_ping', { predator: pr.id, castId: h.castId, arrivalTick: h.arrival, weightedCost: +h.cost.toFixed(3), origin: h.origin });
     if (pr.state !== 'CHASE') { pr.dest = [...h.origin]; pr.curiousStart = this.tick; this.setState(pr, 'CURIOUS', 'heard ping ' + h.castId); }
@@ -150,6 +152,7 @@ class Sim {
     for (const [c, k] of this.cellMem) if (t - k > P.memoryTicks) this.cellMem.delete(c);
     for (const [id, g] of this.ghosts) if (t - g.tick > P.ghostTicks) this.ghosts.delete(id);
     this.castOrigins = this.castOrigins.filter((c) => t - c.tick <= P.castOriginTicks);
+    this.casts = this.casts.filter((c) => t - c.tick <= 50);
   }
 
   pathField(dest) { const k = S.cellIndex(this.grid, dest[0], dest[1]); let f = this.pathCache.get(k); if (!f) { f = S.field(this.grid, dest[0], dest[1], Infinity); this.pathCache.set(k, f); } return f; }
@@ -200,13 +203,27 @@ class Sim {
   // The only world view the view layer may read. No predator positions except short-lived ghosts.
   snapshot() {
     const t = this.tick, segs = [];
-    for (const [id, m] of this.mem) if (t - m.tick <= P.memoryTicks) segs.push({ id, ageTicks: t - m.tick, castId: m.castId });
+    for (const [id, m] of this.mem) if (t - m.tick <= P.memoryTicks) { const e = this.edges[id]; segs.push({ id, ageTicks: t - m.tick, castId: m.castId, p: [e.x1, e.y1, e.x2, e.y2], n: [e.nx, e.ny] }); }
     segs.sort((a, b) => a.id - b.id);
     const cells = []; for (const [c, k] of this.cellMem) if (t - k <= P.memoryTicks) cells.push([c, t - k]); cells.sort((a, b) => a[0] - b[0]);
     return { tick: t, player: [...this.pos], segments: segs, cells, grid: { nx: this.grid.nx, ny: this.grid.ny, cell: this.grid.cell },
-      castOrigins: this.castOrigins.map((c) => ({ castId: c.castId, origin: [...c.origin], ageTicks: t - c.tick })),
+      castOrigins: this.castOrigins.map((c) => ({ castId: c.castId, origin: [...c.origin], ageTicks: t - c.tick, heardAgeTicks: c.heardTick < 0 ? null : t - c.heardTick })),
+      waves: this.waves(t),
       ghosts: [...this.ghosts.values()].map((g) => ({ pos: [...g.pos], ageTicks: t - g.tick })),
       knownExit: this.exitKnown ? [...this.level.goal.exit_xy] : null };
+  }
+
+  // Incident front samples for the renderer: only cells the wave is touching right now, with the local direction of travel.
+  waves(t) {
+    const out = [], g = this.grid;
+    for (const c of this.casts) {
+      const age = t - c.tick; if (age < 0 || age > 50) continue; const front = age / HZ * S.PULSE_SPEED, F = c.field, pts = [];
+      for (let j = 1; j < g.ny - 1; j++) for (let i = 1; i < g.nx - 1; i++) { const k = j * g.nx + i, v = F[k]; if (v === Infinity || Math.abs(v - front) > 0.1 || ((i >> 1) + (j >> 1)) % 3 === 0) continue;
+        const a = F[k + 1], b = F[k - 1], u = F[k + g.nx], d = F[k - g.nx]; let gx = isFinite(a) && isFinite(b) ? a - b : 0, gy = isFinite(u) && isFinite(d) ? u - d : 0; const m = Math.hypot(gx, gy) || 1; gx /= m; gy /= m;
+        pts.push([+((i + 0.5) * g.cell).toFixed(3), +((j + 0.5) * g.cell).toFixed(3), +(-gy).toFixed(3), +gx.toFixed(3), +Math.max(0, 1 - v / S.PULSE_MAX_COST).toFixed(3)]); }
+      out.push({ castId: c.castId, ageTicks: age, pts });
+    }
+    return out;
   }
 
   // Explanation built only from the event log.

@@ -9,6 +9,7 @@ var memory_segments: Array[Dictionary] = []  # {a, b, age_ticks, cast_id}
 var cast_origins: Array[Dictionary] = []  # {origin, age_ticks, cast_id}
 var threat_ghosts: Array[Dictionary] = []  # {position, age_ticks, direct}
 var known_exit: Variant = null  # Vector2 once legitimately sensed, otherwise null
+var waves: Array = []  # [{cast_id, age_ticks, points: [[x, y, tx, ty, energy]]}] cells the wave is touching now
 var known_cells: Array = []  # [cell_id, age_ticks] open floor the player has sensed
 var grid_nx: int = 0
 var grid_ny: int = 0

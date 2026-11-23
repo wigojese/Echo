@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "art_system": "D The Listening Plate",
+  "note": "Values the renderer and the future shaders share. The browser renderer in reference/graybox/plate_world.js is the working reference. Shaders are not authored yet.",
+  "line_art": {
+    "stroke_px_at_reference_zoom": {"fresh": 2.3, "afterglow": [1.9, 1.6], "memory": [1.45, 0.95], "player": 2.4, "ui_outline": 1.5},
+    "memory_dash_px": {"verified": [7, 2.2], "residue": [3.2, 3.6]},
+    "erosion": {"chunk_m": 0.9, "keep_curve": "1 - 0.92 * u^1.15, u = (age - 1.4 s) / 6.6 s"}
+  },
+  "halo": {
+    "side": "known floor only, never centred on the wall face",
+    "width_px_per_bloom": 5,
+    "width_cap_px": 26,
+    "alpha_per_bloom": 0.22,
+    "alpha_cap": 0.9,
+    "applies_while": "fresh (0 to 0.35 s) and the first half of afterglow"
+  },
+  "fringe": {"offset_px": 2.2, "dash_px": [2, 3], "alpha_fresh": 0.55, "side": "known floor only"},
+  "incident_front": {"dash_half_length_px": 3.6, "width_px": 2.6, "alpha": [0.55, 0.95], "source": "cells the wave is touching, from the solver field"},
+  "particles": {"budget": 200, "radius_px": 1, "life_ticks": 10, "rate": 0.18, "color": "paper_chalk"},
+  "grain": {"tile_px": 256, "alpha": 0.07, "anchor": "world", "rule": "tile moves with the world, never with the screen"},
+  "bloom": {"default": 1, "never_exceeds_wall": true},
+  "materials": [
+    {"id": "air", "contour": "soft", "response": "standard"},
+    {"id": "absorbent", "contour": "granular", "response": "weaker, ragged imprint. Not rendered differently yet (L02)."},
+    {"id": "reflective", "contour": "double", "response": "delayed secondary stain on the contacted face only. Not rendered yet (L06)."}
+  ]
+}

@@ -1,0 +1,15 @@
+PASS  C1 sealed wall, normal bloom: the far corridor stays dark  far max luminance 27, bright pixels 0
+PASS  C1b sealed wall, bloom 16 (nearly three times the cap): the far corridor stays dark  far max luminance 27, bright pixels 0
+PASS  C1c heavy bloom really is brighter on the near side, so the dark far side is not trivial  bright pixels near: bloom 1 = 1747, bloom 16 = 4865
+PASS  C1d negative control: a naive halo centred on the wall at the same bloom DOES leak, so this test can fail  far bright pixels with the naive halo 2280
+PASS  C2 different hidden creature positions render byte-identical frames (16 frames compared)
+PASS  C3 a creature that has not been sensed is not drawn, and nothing near it is lit  on screen at (274,276), region max luminance 26
+PASS  C4 fresh contact has at least 3:1 contrast against the plate  13.8:1
+PASS  C4b afterglow has at least 3:1  11.4:1
+PASS  C4c verified memory has at least 3:1, residue is allowed to fade below it  fresh 13.8, memory 5.0, residue 1.8
+PASS  C5 the Echo label has at least 4.5:1 contrast against its button  14.9:1
+PASS  C6 the grain is world-anchored: it moves with the world, not the screen  error after the matching shift x=0.000 y=0.000, error with no shift 0.44
+PASS  C7 budgets over a full run: at most 200 particles, 1,500 contour segments, 2 overlapping waves  max particles 30, max segments 451, max waves 1
+PASS  C7b pinging as fast as the cooldown allows: never more than 2 waves, 200 particles or 1,500 segments  waves 2, particles 17, segments 196
+PERF render() plus raster flush, headless Chromium software rendering on a server CPU, replay B at tick 520 (not a phone): graybox p50 0.30 ms p95 0.50 ms | plate p50 3.30 ms p95 3.50 ms | delta p50 3.00 ms
+RESULT 13 passed, 0 failed

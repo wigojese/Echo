@@ -12,6 +12,8 @@
     "evidence": "node tools/replay_viewer/shots.js",
     "test:stage09": "node tests/js/stage09.test.js",
     "audit:input": "node tools/input_latency/measure.js",
-    "evidence:input": "node tools/input_latency/shots.js"
+    "evidence:input": "node tools/input_latency/shots.js",
+    "test:render": "node tools/render_contracts/run.js",
+    "evidence:render": "node tools/render_contracts/shots.js"
   }
 }

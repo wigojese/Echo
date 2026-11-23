@@ -50,7 +50,7 @@ const noPred = (l) => { const c = clone(l); c.predators = []; return c; };
   check('12b the ghost stays where the creature was, never at its current position', notLive); }
 { const s = new Sim(L01, G01), by = new Map(); RA.inputs.forEach((i) => by.set(i.tick, [...(by.get(i.tick) || []), i])); const keys = new Set();
   for (let k = 0; k < 700; k++) { s.step(by.get(s.tick) || []); Object.keys(s.snapshot()).forEach((x) => keys.add(x)); }
-  check('13 the snapshot exposes no predator field', [...keys].sort().join() === ['castOrigins', 'cells', 'ghosts', 'grid', 'knownExit', 'player', 'segments', 'tick'].sort().join(), [...keys].join()); }
+  check('13 the snapshot exposes no predator field', [...keys].sort().join() === ['castOrigins', 'cells', 'ghosts', 'grid', 'knownExit', 'player', 'segments', 'tick', 'waves'].sort().join(), [...keys].join()); }
 // 14-18 predator
 { const s = runReplay(L01, G01, RA), c = kinds(s, 'ping_cast')[0], h = kinds(s, 'heard_ping')[0];
   check('14 a ping at the fork is heard at the computed weighted cost and delay', h && h.payload.weightedCost <= 11 && h.tick === c.tick + Math.ceil(h.payload.weightedCost / 9 * 30), `cost=${h && h.payload.weightedCost}, delay=${h && h.tick - c.tick} ticks`); }

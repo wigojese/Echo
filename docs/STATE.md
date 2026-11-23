@@ -9,12 +9,13 @@ Updated: 2026-11-22. Branch: `claude/keen-volta-mjk5nm`.
 - **Stage 05, visual identity exploration:** delivered in two rounds (see `design/stage05/`). **Closed.** The user selected **D, The Listening Plate** (EC-D-002). No features from other directions were named as permitted.
 - **Stage 07, production architecture:** **Approved** by the user on 2026-11-22 (EC-D-009).
 - **Stage 08, EC-L01 graybox:** **Approved** by the user on 2026-11-22 (EC-D-012). See `docs/STAGE08_GRAYBOX.md`.
-- **Stage 09, input feel:** both control schemes built and tested with emulated touch, **no real phone was used**. The primary scheme is undecided (EC-D-013). See `docs/INPUT_SPEC.md`.
+- **Stage 09, input feel:** **Approved** as delivered (EC-D-016). No real phone was used and the primary scheme is still undecided (EC-D-013). See `docs/INPUT_SPEC.md`.
+- **Stage 10, phosphor visual system:** delivered as browser renders with 13 pixel contracts, **nothing engine-rendered**. See `docs/STAGE10_VISUAL.md`.
 - **Stage 06, engine and acoustic feasibility spike:** **Approved as delivered** by the user on 2026-11-22 (EC-D-005). The engine comparison stays **BLOCKED**, the solver reference is **tested**. See `docs/STAGE06_SPIKE.md`.
 
 ## Pending stage
 
-Stage 09, input feel. Delivered as far as this sandbox allows, **awaiting your approval**. Stages 05, 06, 07 and 08 are approved.
+Stage 10, phosphor visual system. Delivered as a browser render, **awaiting your approval**. Stages 05 to 09 are approved.
 
 ## Pinned versions
 

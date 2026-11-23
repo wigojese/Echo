@@ -93,13 +93,13 @@ func wall_edges() -> Array[Dictionary]:
             var y1 := y0 + cell
             var c := j * nx + i
             if not is_walkable(i - 1, j):
-                out.append({"cell": c, "a": Vector2(x0, y0), "b": Vector2(x0, y1)})
+                out.append({"cell": c, "a": Vector2(x0, y0), "b": Vector2(x0, y1), "n": Vector2(1, 0)})
             if not is_walkable(i + 1, j):
-                out.append({"cell": c, "a": Vector2(x1, y0), "b": Vector2(x1, y1)})
+                out.append({"cell": c, "a": Vector2(x1, y0), "b": Vector2(x1, y1), "n": Vector2(-1, 0)})
             if not is_walkable(i, j - 1):
-                out.append({"cell": c, "a": Vector2(x0, y0), "b": Vector2(x1, y0)})
+                out.append({"cell": c, "a": Vector2(x0, y0), "b": Vector2(x1, y0), "n": Vector2(0, 1)})
             if not is_walkable(i, j + 1):
-                out.append({"cell": c, "a": Vector2(x0, y1), "b": Vector2(x1, y1)})
+                out.append({"cell": c, "a": Vector2(x0, y1), "b": Vector2(x1, y1), "n": Vector2(0, -1)})
     for k in range(out.size()):
         out[k]["id"] = k
     return out
