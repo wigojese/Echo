@@ -51,7 +51,7 @@ class Sim {
     this.pos = [...L.player.spawn_xy]; this.vel = [0, 0]; this.dir = [0, 0]; this.quiet = false;
     this.nextPingTick = 0; this.castCount = 0; this.pathLen = 0; this.exitTicks = 0;
     this.events = []; this.scheduled = new Map(); this.casts = [];
-    this.casts = []; this.mem = new Map(); this.cellMem = new Map(); this.ghosts = new Map(); this.castOrigins = []; this.exitKnown = false;
+    this.trail = [[...L.player.spawn_xy]]; this.casts = []; this.mem = new Map(); this.cellMem = new Map(); this.ghosts = new Map(); this.castOrigins = []; this.exitKnown = false;
     this.lastField = null;
     this.pred = (L.predators || []).map((p) => ({ id: p.id, pos: [...p.spawn_xy], wp: p.patrol_waypoints, wpIdx: 1, state: 'PATROL',
       dest: null, lastHeardOrigin: null, lastHeardTick: -1, lastSeenPlayerTick: -1, investigationCount: 0, heardCastIds: [],
@@ -107,6 +107,8 @@ class Sim {
       else if (this.circleClear(x, y + dy, P.playerRadius)) y += dy;
       this.pathLen += Math.hypot(x - this.pos[0], y - this.pos[1]); this.pos = [x, y];
     }
+    // breadcrumb trail: where you have actually walked, one point every 0.75 m, capped
+    const lt = this.trail[this.trail.length - 1]; if (Math.hypot(this.pos[0] - lt[0], this.pos[1] - lt[1]) >= 0.75) { this.trail.push([...this.pos]); if (this.trail.length > 600) this.trail.shift(); }
   }
 
   ping(t) {
@@ -208,7 +210,7 @@ class Sim {
     const cells = []; for (const [c, k] of this.cellMem) if (t - k <= P.memoryTicks) cells.push([c, t - k]); cells.sort((a, b) => a[0] - b[0]);
     return { tick: t, player: [...this.pos], segments: segs, cells, grid: { nx: this.grid.nx, ny: this.grid.ny, cell: this.grid.cell },
       castOrigins: this.castOrigins.map((c) => ({ castId: c.castId, origin: [...c.origin], ageTicks: t - c.tick, heardAgeTicks: c.heardTick < 0 ? null : t - c.heardTick })),
-      waves: this.waves(t),
+      waves: this.waves(t), trail: this.trail.map((p) => [...p]),
       ghosts: [...this.ghosts.values()].map((g) => ({ pos: [...g.pos], ageTicks: t - g.tick })),
       knownExit: this.exitKnown ? [...this.level.goal.exit_xy] : null };
   }

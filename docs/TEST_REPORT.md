@@ -9,13 +9,15 @@ Updated 2026-11-23. Host: v22.23.5, Intel(R) Xeon(R) Processor @ 2.30GHz, linux/
 | Acoustic solver reference, 13 tests | IMPLEMENTED/TESTED |
 | Reference simulation, 31 tests | IMPLEMENTED/TESTED |
 | Input router, planner and control modes, 30 tests | IMPLEMENTED/TESTED |
+| Camera director, 20 tests | IMPLEMENTED/TESTED |
+| Gesture conflicts, 20 tests | IMPLEMENTED/TESTED |
 | Level validator, firewall scanner, style tokens, 17 checks | IMPLEMENTED/TESTED |
-| Pixel-level render contracts for the D renderer, 13 checks (browser, software rendering) | IMPLEMENTED/TESTED, **not Godot** |
+| Pixel-level render contracts, 18 checks (browser, software rendering) | IMPLEMENTED/TESTED, **not Godot** |
 | Emulated touch audit and input timing (headless Chromium) | EMULATED, not a phone |
 | GDScript syntax, 21 files, gdtoolkit 4.5.0 | IMPLEMENTED/TESTED, **syntax only** |
 | GDScript unit tests in `tests/run_tests.gd` | **BLOCKED/UNVERIFIED**, never run |
 | Engine-rendered screenshots, shaders, in-engine recording | **BLOCKED**, no Godot |
-| Finger comfort and real brightness and daylight legibility on a phone | **BLOCKED/UNVERIFIED**, no device |
+| Finger comfort, real pinch and scrub feel, daylight legibility | **BLOCKED/UNVERIFIED**, no device |
 
 Manual test to close the Godot gap, on a machine with Godot 4.7:
 
@@ -40,8 +42,8 @@ PASS  determinism: two runs give bit-identical cost fields
 PASS  hearing: ping at the fork is heard by the listener  cost=7.93 m, arrives 0.88 s after cast
 PASS  hearing: ping at spawn is not heard  cost=Infinity
 PASS  origin: field is rooted at the cast position (cost 0 there, 3.5 m to where the player went)  cost to later position=3.50
-BENCH L01 at 0.25 m cells: p50=0.455 ms  p95=0.814 ms  max=1.175 ms  (n=300, cells=13824)
-BENCH L01 at 0.20 m cells: p50=0.849 ms  p95=1.393 ms  max=2.221 ms  (n=300, cells=21600)
+BENCH L01 at 0.25 m cells: p50=0.492 ms  p95=0.816 ms  max=0.963 ms  (n=300, cells=13824)
+BENCH L01 at 0.20 m cells: p50=0.704 ms  p95=1.022 ms  max=1.110 ms  (n=300, cells=21600)
 
 HOST node v22.23.5, Intel(R) Xeon(R) Processor @ 2.30GHz, 4 logical CPUs, linux/x64
 RESULT 13 passed, 0 failed
@@ -85,7 +87,7 @@ PASS  10 one ping from spawn does not reveal the exit
 PASS  11 static memory fully expires within 8 s of the last contact
 PASS  12 a creature is remembered only as a ghost that is gone within 1.25 s
 PASS  12b the ghost stays where the creature was, never at its current position
-PASS  13 the snapshot exposes no predator field  tick,player,segments,cells,grid,castOrigins,waves,ghosts,knownExit
+PASS  13 the snapshot exposes no predator field  tick,player,segments,cells,grid,castOrigins,waves,trail,ghosts,knownExit
 PASS  14 a ping at the fork is heard at the computed weighted cost and delay  cost=8.786, delay=30 ticks
 PASS  15 a ping at spawn is never heard
 PASS  16 moving after the ping: the listener goes to the old origin, not to the player  player is 5.2 m from the origin
@@ -140,6 +142,56 @@ PASS  S12 you can move at the very start, inside the opening-breath chamber, bef
 RESULT 30 passed, 0 failed
 ```
 
+### `node tests/js/stage11.test.js`
+```
+PASS  01 screen to world and back is exact across 5,000 random cameras  worst error 1.4e-14 m
+PASS  02 the touch-to-world mapping is exact on every frame of the pullback, scrub and return  180 frames, worst error 5.3e-15 m
+PASS  03 pinch keeps the world point under the fingers within 2 px (1,000 pinches, follow and trace)  1000 effective pinches, worst drift 8.0e-14 px
+PASS  04 zoom never leaves 0.60 to 1.75 however hard you pinch  range 0.60 to 1.75
+PASS  05 band thresholds: close from 1.42 up to 1.28, memory from 0.78 up to 0.90  active,close,close,active,active,memory,memory,active
+PASS  06 a full sweep changes band exactly 4 times, and zoom jitter inside the dead zone never flips it  sweep flips 4, jitter flips 0
+PASS  07 TRACE needs two connected segments and something remembered
+PASS  08 the TRACE path stays within 0.9 m of where you actually walked, from entry to now  103 samples, worst offset 0.26 m, length 25.5 m
+PASS  09 scrubbing never moves faster than one screen width per second, however violent the swipe  worst 27.08 m/s, cap 27.08 m/s
+PASS  10 releasing stops the camera within 220 ms and it never flings  s=22.34 of 25.5
+PASS  10b scrubbing past the start stays clamped at the entry
+PASS  11 from far along the trace the player is flagged off-screen, and one return puts the camera back on them
+PASS  11b the same from a manual pan
+PASS  12 reduced motion: the camera jumps with a 120 ms fade and never travels through in-between frames  2 distinct zooms, fade 1 then 0
+PASS  13 different hidden listener positions and different hidden exits give identical camera frames for 300 ticks, through trace, pinch and return  3 worlds, 300 frames each
+PASS  14 the world pauses in TRACE and only in TRACE
+PASS  15 steering beats a manual frame: the camera returns to you within 450 ms
+PASS  15b while steering, pan is refused and a pinch zooms about you without moving you on screen
+PASS  16 the opening breath drops 1.25 to 1.0 in 450 ms, instantly with a fade under reduced motion
+PASS  17 echo labels exist only in TRACE and carry the logged ages
+RESULT 20 passed, 0 failed
+```
+
+### `node tests/js/stage11_gestures.test.js`
+```
+PASS  G1 tapping TRACE when there is something to review enters TRACE; when there is not, nothing happens
+PASS  G2 in TRACE the world is paused, so Echo, Quiet step and Pause do nothing
+PASS  G3 a swipe on the TRACE rail scrubs and never reaches the world or Echo
+PASS  G4 a swipe that starts on the rail keeps scrubbing even when the finger drifts onto Echo or off the rail
+PASS  G5 the Return to listener button returns, and only that button
+PASS  G5b the Recenter chip returns the camera while it is off you, and is inert otherwise
+PASS  G6 a drag in a blank world when you are steering or walking a route does not pan the camera
+PASS  G7 a blank-world drag when you are not steering pans after 12 px, ends cleanly and never sets a waypoint
+PASS  G8 a drag of 8 to 12 px is a dead zone: neither a tap nor a pan
+PASS  G9 a two-finger pinch emits anchored zoom from the midpoint, and releasing sets no waypoint
+PASS  G10 a pinch smaller than 6 percent is ignored
+PASS  G11 steering with the stick plus one finger in the world is not a pinch
+PASS  G12 Echo with one finger and a world touch with another is not a pinch, and pings once
+PASS  G13 a pan that turns into a pinch cancels the pan and the first finger stops panning
+PASS  G14 a third finger during a pinch is ignored
+PASS  G15 an interruption in the middle of a pan or a pinch cancels all of it and never pings
+PASS  G16 in the paused menu only Resume, Trace and Pause answer; the world and Echo do nothing
+PASS  G17 taps in the world do not make waypoints while reviewing
+PASS  G18 right-handed layout: Echo, Quiet, TRACE, Recenter and Pause hit areas never overlap and all are at least 44 px  no overlaps
+PASS  G18 left-handed layout: Echo, Quiet, TRACE, Recenter and Pause hit areas never overlap and all are at least 44 px  no overlaps
+RESULT 20 passed, 0 failed
+```
+
 ### `cat reference/evidence/render-contracts.txt`
 ```
 PASS  C1 sealed wall, normal bloom: the far corridor stays dark  far max luminance 27, bright pixels 0
@@ -155,8 +207,13 @@ PASS  C5 the Echo label has at least 4.5:1 contrast against its button  14.9:1
 PASS  C6 the grain is world-anchored: it moves with the world, not the screen  error after the matching shift x=0.000 y=0.000, error with no shift 0.44
 PASS  C7 budgets over a full run: at most 200 particles, 1,500 contour segments, 2 overlapping waves  max particles 30, max segments 451, max waves 1
 PASS  C7b pinging as fast as the cooldown allows: never more than 2 waves, 200 particles or 1,500 segments  waves 2, particles 17, segments 196
-PERF render() plus raster flush, headless Chromium software rendering on a server CPU, replay B at tick 520 (not a phone): graybox p50 0.30 ms p95 0.50 ms | plate p50 3.30 ms p95 3.50 ms | delta p50 3.00 ms
-RESULT 13 passed, 0 failed
+PERF render() plus raster flush, headless Chromium software rendering on a server CPU, replay B at tick 520 (not a phone): graybox p50 0.60 ms p95 0.80 ms | plate p50 3.40 ms p95 4.50 ms | delta p50 2.80 ms
+PASS  C8 close view (zoom 1.60): every lit pixel is next to something the player knows  band close, lit samples 257, unexplained 0, segments drawn 148
+PASS  C8 active view (zoom 1.00): every lit pixel is next to something the player knows  band active, lit samples 226, unexplained 0, segments drawn 148
+PASS  C8 memory view (zoom 0.70): every lit pixel is next to something the player knows  band memory, lit samples 132, unexplained 0, segments drawn 148
+PASS  C8b all three views draw the same set of known wall faces at the same tick  148 / 148 / 148
+PASS  C8c negative control: one bright line drawn where nothing is known is caught by the same check  unexplained lit samples 81
+RESULT 18 passed, 0 failed
 ```
 
 ### `cat reference/evidence/input-audit.txt`
@@ -164,8 +221,8 @@ RESULT 13 passed, 0 failed
 AUDIT emulated touch, headless Chromium 157.0.8103.78, 390x844 CSS px, dsf 2. Not a phone.
 MODE waypoint: A deliberate Echo taps pinged 50/50 | B world-to-Echo drags pinged 0/50 (want 0) | C stray taps near Echo pinged 0/50 (want 0) | D interrupted presses pinged 0/20 (want 0) | E two fingers: n/a
 MODE joystick: A deliberate Echo taps pinged 50/50 | B world-to-Echo drags pinged 0/50 (want 0) | C stray taps near Echo pinged 0/50 (want 0) | D interrupted presses pinged 0/20 (want 0) | E two fingers: moved 0.70 m while 1 echo(es) sent
-LATENCY touch-down on Echo to the render frame that includes the cast: n=100 p50=25.7 ms p95=28.8 ms max=31.1 ms (headless, event dispatch to rAF callback)
-FRAMES headless rAF interval: p50=16.7 ms p95=16.7 ms p99=16.8 ms (software rendering, server CPU)
+LATENCY touch-down on Echo to the render frame that includes the cast: n=100 p50=27.8 ms p95=29.3 ms max=46.1 ms (headless, event dispatch to rAF callback)
+FRAMES headless rAF interval: p50=16.7 ms p95=16.8 ms p99=16.8 ms (software rendering, server CPU)
 ```
 
 ### `node tools/check_firewall.js`

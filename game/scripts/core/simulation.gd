@@ -26,6 +26,7 @@ var _scheduled: Dictionary = {}
 var _active_casts: Array[Dictionary] = []
 var _path_cache: Dictionary = {}
 var _exit_ticks: int = 0
+var trail: Array[Vector2] = []
 var _exit_pos: Vector2 = Vector2.ZERO
 
 
@@ -59,6 +60,8 @@ func reset(first: bool = false) -> void:
     motion = MotionController.new()
     var spawn: Array = level["player"]["spawn_xy"]
     motion.position = Vector2(spawn[0], spawn[1])
+    trail.clear()
+    trail.append(motion.position)
     var exit_xy: Array = level["goal"]["exit_xy"]
     _exit_pos = Vector2(exit_xy[0], exit_xy[1])
     predators.clear()
@@ -98,6 +101,10 @@ func step(inputs: Array = []) -> void:
             "ping":
                 _ping(t)
     motion.step(grid)
+    if motion.position.distance_to(trail[trail.size() - 1]) >= 0.75:
+        trail.append(motion.position)
+        if trail.size() > 600:
+            trail.pop_front()
     if _scheduled.has(t):
         for fn in _scheduled[t]:
             fn.call()
@@ -137,6 +144,7 @@ static func group_replay(replay: Dictionary) -> Dictionary:
 func snapshot() -> VisibleWorldSnapshot:
     var snap := KnowledgeGate.build(motion.position, knowledge, _exit_pos, tick, {"nx": grid.nx, "ny": grid.ny, "cell": grid.cell})
     snap.waves = _waves(tick)
+    snap.trail = trail.duplicate()
     return snap
 
 

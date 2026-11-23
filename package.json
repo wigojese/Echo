@@ -6,7 +6,7 @@
     "test:stage07": "node tests/js/stage07.test.js",
     "check:firewall": "node tools/check_firewall.js",
     "check:level": "node tools/map_validator/validate.js",
-    "check": "npm run test:solver && npm run test:stage07 && npm run test:stage08 && npm run test:stage09 && npm run check:firewall && npm run check:level",
+    "check": "npm run test:solver && npm run test:stage07 && npm run test:stage08 && npm run test:stage09 && npm run test:stage11 && npm run test:gestures && npm run check:firewall && npm run check:level",
     "test:stage08": "node tests/js/stage08.test.js",
     "replays": "node tools/replay_viewer/make_replays.js",
     "evidence": "node tools/replay_viewer/shots.js",
@@ -14,6 +14,9 @@
     "audit:input": "node tools/input_latency/measure.js",
     "evidence:input": "node tools/input_latency/shots.js",
     "test:render": "node tools/render_contracts/run.js",
-    "evidence:render": "node tools/render_contracts/shots.js"
+    "evidence:render": "node tools/render_contracts/shots.js",
+    "test:stage11": "node tests/js/stage11.test.js",
+    "test:gestures": "node tests/js/stage11_gestures.test.js",
+    "evidence:camera": "node tools/camera_demo/shots.js"
   }
 }

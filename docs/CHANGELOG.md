@@ -26,3 +26,8 @@
 - Stage 10: D renderer, snapshot additions (wall coordinates and normals, wave front, heard flag), 13 render contracts, captures, recording, GDScript `PulseRenderer`, material tokens, art bible.
 - Fixed during the stage: the sealed-wall bloom test first passed vacuously (captured after the halo faded). It now captures in the fresh phase and has a negative control. A contrast sample that included the player glyph and a render timing that skipped rasterisation were also corrected.
 - Renamed the replay B decayed frame to `plate-07-decayed-no-echo`. Added `plate-05-exit-known` with a real ping near the exit.
+
+- Stage 10 approved.
+- Stage 11: camera director (4 states, zoom bands with hysteresis, anchored pinch, TRACE path), router additions (TRACE chip, rail, Return, Recenter, pan, pinch, paused menu), player trail in the snapshot, graybox rewrite around the camera, 5 new render contracts, recording and stills, GDScript port.
+- Stage 8 test 13 now expects the `trail` key. No other earlier test changed.
+- Found and fixed: input latency regression from a double snapshot per frame (61.7 ms back to 36.4 ms), a global name clash, and a title overlap in the TRACE view.

@@ -68,3 +68,18 @@ From `reference/evidence/input-audit.txt`:
 5. **Camera drag, pinch zoom and the Trace rail** do not exist yet, so "no accidental ping from camera drag" is tested only against world drags.
 6. **Haptics** are not implemented.
 7. **Left-handed mode** mirrors three controls. Pause stays top right in both layouts.
+
+
+## Stage 11 additions
+
+| Starts on | Action | Result |
+|---|---|---|
+| TRACE chip (62 x 46, bottom centre) | touch-down | enters TRACE if something is remembered. Inert otherwise |
+| Recenter chip (100 x 44, top centre, shown only while the camera is off you) | touch-down | one-tap return |
+| Rail (right edge, in TRACE) | drag | scrub, speed capped at one screen width per second |
+| Return button (220 x 56, bottom, in TRACE) | touch-down | return to the player and resume |
+| Blank world, not steering | drag over 12 px | pan. Between 8 and 12 px nothing happens |
+| Two fingers on the world | spread or pinch over 6 percent | anchored zoom about the midpoint |
+| Paused menu variant | Resume, Trace | only these answer |
+
+See `docs/GESTURE_CONFLICTS.md` for every pair that could collide.

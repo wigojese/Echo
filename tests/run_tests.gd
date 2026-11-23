@@ -239,3 +239,97 @@ func test_input_planner_truncates_at_known_boundary() -> void:
         if not known.has(c):
             inside = false
     _check("input: tapping unlit floor routes only through known cells and is marked truncated", result["truncated"] and inside)
+
+
+# ---- Stage 11: camera director and gestures, mirrors tests/js/stage11*.test.js. Never run in Godot yet. ----
+
+func test_camera_band_hysteresis() -> void:
+    var b: StringName = &"active"
+    var got: Array = []
+    for z in [1.41, 1.42, 1.30, 1.28, 0.79, 0.78, 0.89, 0.90]:
+        b = CameraDirector.next_band(b, z)
+        got.append(b)
+    _check("camera: bands switch at 1.42 / 1.28 and 0.78 / 0.90 with hysteresis", got == [&"active", &"close", &"close", &"active", &"active", &"memory", &"memory", &"active"], str(got))
+
+
+func test_camera_pinch_keeps_anchor_and_clamps() -> void:
+    var sim := _l01()
+    var snap := sim.snapshot()
+    var cam := CameraDirector.new()
+    var anchor := Vector2(120, 300)
+    var c0: Dictionary = cam.frame(snap)
+    var w := CameraDirector.screen_to_world(anchor, c0["center"], CameraDirector.BASE_PX * float(c0["zoom"]))
+    cam.pinch(anchor, 1.3, snap)
+    var c1: Dictionary = cam.frame(snap)
+    var back := CameraDirector.world_to_screen(w, c1["center"], CameraDirector.BASE_PX * float(c1["zoom"]))
+    _check("camera: pinch keeps the world point under the fingers within 2 px", back.distance_to(anchor) <= 2.0, str(back.distance_to(anchor)))
+    for _i in range(40):
+        cam.pinch(anchor, 1.5, snap)
+    _check("camera: zoom never exceeds 1.75", cam.zoom <= CameraDirector.Z_MAX)
+
+
+func test_camera_trace_path_stays_on_the_walked_trail() -> void:
+    var sim := _l01()
+    sim.run_inputs(Simulation.group_replay(_json("res://reference/replays/B_heard_and_escaped.json")), 600)
+    var snap := sim.snapshot()
+    var cam := CameraDirector.new()
+    _check("camera: TRACE is available after a walked bend with something remembered", cam.enter_trace(snap))
+    var raw: Array = snap.trail.duplicate()
+    raw.append(snap.player_position)
+    var worst := 0.0
+    for q in cam.trace["pts"]:
+        var best := INF
+        for i in range(1, raw.size()):
+            var a: Vector2 = raw[i - 1]
+            var b: Vector2 = raw[i]
+            var ab := b - a
+            var l2 := ab.length_squared()
+            var t := 0.0 if l2 == 0.0 else clampf((Vector2(q.x, q.y) - a).dot(ab) / l2, 0.0, 1.0)
+            best = minf(best, Vector2(q.x, q.y).distance_to(a + ab * t))
+        worst = maxf(worst, best)
+    _check("camera: the TRACE path stays within 0.9 m of where the player walked", worst < 0.9, str(worst))
+    _check("camera: the world pauses in TRACE", cam.frame(snap)["pause_sim"])
+
+
+func test_camera_independent_of_hidden_exit_and_listener() -> void:
+    var level_b := _json("res://game/resources/levels/EC-L01.json")
+    level_b["goal"]["exit_xy"] = [22, 17]
+    level_b["predators"][0]["spawn_xy"] = [17, 24]
+    level_b["predators"][0]["patrol_waypoints"] = [[17, 24], [13, 24]]
+    var a := _l01()
+    var b := Simulation.new(level_b, _json("res://game/resources/levels/EC-L01-geometry.json"))
+    var plan := {0: [{"type": "move", "dx": 0, "dy": 1}], 20: [{"type": "ping"}], 70: [{"type": "move", "dx": 1, "dy": 0}], 90: [{"type": "stop"}]}
+    var ca := CameraDirector.new()
+    var cb := CameraDirector.new()
+    var same := true
+    for _k in range(150):
+        a.step(plan.get(a.tick, []))
+        b.step(plan.get(b.tick, []))
+        ca.tick(33.3)
+        cb.tick(33.3)
+        if ca.frame(a.snapshot()) != cb.frame(b.snapshot()):
+            same = false
+    _check("camera: different hidden exit and listener positions give identical framing", same)
+
+
+func test_input_trace_and_pinch_gestures() -> void:
+    var r := InputRouter.new()
+    r.trace_enabled = true
+    r.pointer_down(1, Vector2(229, 740), 0.0)
+    r.pointer_up(1, Vector2(229, 740), 40.0)
+    _check("input: tapping TRACE enters TRACE", _kinds(r) == ["trace_enter"])
+    r.trace_mode = true
+    r.pointer_down(1, Vector2(318, 740), 0.0)
+    r.pointer_up(1, Vector2(318, 740), 40.0)
+    _check("input: Echo does nothing while reviewing", _kinds(r).is_empty())
+    var p := InputRouter.new()
+    p.pointer_down(1, Vector2(150, 400), 0.0)
+    p.pointer_down(2, Vector2(250, 400), 10.0)
+    p.pointer_move(1, Vector2(140, 400), 20.0)
+    p.pointer_move(2, Vector2(260, 400), 30.0)
+    p.pointer_move(1, Vector2(120, 400), 40.0)
+    p.pointer_move(2, Vector2(280, 400), 50.0)
+    p.pointer_up(1, Vector2(120, 400), 60.0)
+    p.pointer_up(2, Vector2(280, 400), 70.0)
+    var k := _kinds(p)
+    _check("input: a pinch emits zoom and never a waypoint", k.has("pinch") and not k.has("waypoint"))

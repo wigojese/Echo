@@ -30,7 +30,7 @@ function plan(snap, target) {
 class Driver {
   constructor() { this.stuckTicks = 0; this.stuckAt = null; this.stuck = 0; this.path = null; this.stick = null; this.quiet = false; this.last = [NaN, NaN]; this.plan = null; this.cancelled = 0; this.pauseToggles = 0; }
   // One call per simulation tick. Returns the inputs for that tick.
-  inputsFor(sim, intents = []) {
+  inputsFor(sim, intents = [], cam = null) {
     const ins = [], pos = sim.pos; // your own position is always known to you; the full snapshot is built only when a waypoint is planned
     const setDir = (d) => { const q = [+d[0].toFixed(2), +d[1].toFixed(2)]; if (q[0] !== this.last[0] || q[1] !== this.last[1]) { this.last = q; ins.push({ type: 'move', dx: q[0], dy: q[1] }); } };
     for (const it of intents) {
@@ -39,7 +39,7 @@ class Driver {
       else if (it.type === 'pause_toggle') this.pauseToggles++;
       else if (it.type === 'joystick') { this.stick = [it.dx, it.dy]; this.path = null; this.plan = null; }
       else if (it.type === 'joystick_end') { this.stick = null; setDir([0, 0]); }
-      else if (it.type === 'waypoint') { this.stick = null; const snap = sim.snapshot(), r = plan(snap, screenToWorld(it, snap.player)); this.plan = r; this.path = r.path.length ? r.path.map((p) => [...p]) : null; if (!this.path) setDir([0, 0]); }
+      else if (it.type === 'waypoint') { this.stick = null; const snap = sim.snapshot(), r = plan(snap, cam ? cam.screenToWorld(it) : screenToWorld(it, snap.player)); this.plan = r; this.path = r.path.length ? r.path.map((p) => [...p]) : null; if (!this.path) setDir([0, 0]); }
       else if (it.type === 'cancel_all') { this.cancelled++; this.stick = null; this.path = null; this.plan = null; setDir([0, 0]); }
     }
     if (this.path) { if (!this.stuckAt || Math.hypot(pos[0] - this.stuckAt[0], pos[1] - this.stuckAt[1]) > 0.05) { this.stuckAt = [...pos]; this.stuckTicks = 0; } else if (++this.stuckTicks >= 45) { this.stuck++; this.path = null; this.stuckAt = null; this.stuckTicks = 0; setDir([0, 0]); } } else { this.stuckAt = null; this.stuckTicks = 0; }

@@ -10,12 +10,13 @@ Updated: 2026-11-22. Branch: `claude/keen-volta-mjk5nm`.
 - **Stage 07, production architecture:** **Approved** by the user on 2026-11-22 (EC-D-009).
 - **Stage 08, EC-L01 graybox:** **Approved** by the user on 2026-11-22 (EC-D-012). See `docs/STAGE08_GRAYBOX.md`.
 - **Stage 09, input feel:** **Approved** as delivered (EC-D-016). No real phone was used and the primary scheme is still undecided (EC-D-013). See `docs/INPUT_SPEC.md`.
-- **Stage 10, phosphor visual system:** delivered as browser renders with 13 pixel contracts, **nothing engine-rendered**. See `docs/STAGE10_VISUAL.md`.
+- **Stage 10, phosphor visual system:** **Approved** as delivered (EC-D-019). Nothing engine-rendered. See `docs/STAGE10_VISUAL.md`.
+- **Stage 11, camera:** delivered in the browser with 20 camera tests, 20 gesture tests and 18 render contracts, **no Godot, no phone**. The TRACE entry control is the open gate question (EC-D-021). See `docs/STAGE11_CAMERA.md`.
 - **Stage 06, engine and acoustic feasibility spike:** **Approved as delivered** by the user on 2026-11-22 (EC-D-005). The engine comparison stays **BLOCKED**, the solver reference is **tested**. See `docs/STAGE06_SPIKE.md`.
 
 ## Pending stage
 
-Stage 10, phosphor visual system. Delivered as a browser render, **awaiting your approval**. Stages 05 to 09 are approved.
+Stage 11, known-path scrolling and semantic zoom. Delivered in the browser, **awaiting your approval**. Stages 05 to 10 are approved.
 
 ## Pinned versions
 

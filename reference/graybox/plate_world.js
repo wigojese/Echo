@@ -27,7 +27,7 @@
 
   // cam: {x, y, K, W, H, py}. opts: {bloom, particles, tick, underlay(ctx), brightnessSafe}
   function draw(ctx, snap, cam, opts = {}) {
-    const { K, W, H } = cam, py = cam.py ?? H * 0.5, bloom = Math.max(0, opts.bloom ?? 1), tick = opts.tick || 0;
+    const { K, W, H } = cam, py = cam.py ?? H * 0.5, bloom = Math.max(0, opts.bloom ?? 1), tick = opts.tick || 0, band = opts.band || 'active', mem = band === 'memory', ss = band === 'close' ? 1.2 : mem ? 0.7 : 1, ids = [];
     const sx = (x) => W / 2 + (x - cam.x) * K, sy = (y) => py - (y - cam.y) * K;
     if (opts.plain) { ctx.fillStyle = C.black; ctx.fillRect(0, 0, W, H); } else { const g = ctx.createRadialGradient(W / 2, py, 40, W / 2, py, H * 0.8); g.addColorStop(0, '#151A16'); g.addColorStop(0.6, '#0E110E'); g.addColorStop(1, C.black); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
     // world-anchored grain: the tile moves with the world, so it never swims under camera motion or zoom
@@ -39,12 +39,12 @@
     for (const s of snap.segments) {
       const t = s.ageTicks / 30, x1 = sx(s.p[0]), y1 = sy(s.p[1]), x2 = sx(s.p[2]), y2 = sy(s.p[3]); nseg++;
       const nxp = s.n[0], nyp = -s.n[1]; // inward normal in screen space
-      if (t < 0.35) { add('f', { col: C.fresh, w: 2.3, a: 1, dash: null }, x1, y1, x2, y2); halo.push([x1, y1, x2, y2, nxp, nyp, 1]); fringe.push([x1, y1, x2, y2, nxp, nyp, 0.55]); }
-      else if (t < 1.4) { const u = (t - 0.35) / 1.05; add('a' + Math.round(u * 5), { col: mix(C.fresh, C.glow, u), w: 1.9 - 0.3 * u, a: 0.95, dash: null }, x1, y1, x2, y2); if (u < 0.5) { halo.push([x1, y1, x2, y2, nxp, nyp, 0.5 * (1 - u * 2)]); fringe.push([x1, y1, x2, y2, nxp, nyp, 0.4 * (1 - u * 2)]); } }
+      if (t < 0.35) { ids.push(s.id); add('f', { col: C.fresh, w: 2.3 * ss, a: 1, dash: null }, x1, y1, x2, y2); if (!mem) { halo.push([x1, y1, x2, y2, nxp, nyp, 1]); fringe.push([x1, y1, x2, y2, nxp, nyp, 0.55]); } }
+      else if (t < 1.4) { const u = (t - 0.35) / 1.05; ids.push(s.id); add('a' + Math.round(u * 5), { col: mix(C.fresh, C.glow, u), w: (1.9 - 0.3 * u) * ss, a: 0.95, dash: null }, x1, y1, x2, y2); if (u < 0.5 && !mem) { halo.push([x1, y1, x2, y2, nxp, nyp, 0.5 * (1 - u * 2)]); fringe.push([x1, y1, x2, y2, nxp, nyp, 0.4 * (1 - u * 2)]); } }
       else if (t < 8) { const u = (t - 1.4) / 6.6, keep = 1 - 0.92 * Math.pow(u, 1.15), mx = (s.p[0] + s.p[2]) / 2, my = (s.p[1] + s.p[3]) / 2;
         if (hash(Math.floor(mx / 0.9) + s.n[0] * 7, Math.floor(my / 0.9) + s.n[1] * 5) > keep) continue;
         const col = u < 0.5 ? mix(C.glow, C.mem, u * 2) : mix(C.mem, C.res, (u - 0.5) * 2), q = Math.round(u * 8);
-        add('m' + q, { col, w: 1.45 - 0.5 * u, a: 0.95, dash: u < 0.55 ? [7, 2.2] : [3.2, 3.6] }, x1, y1, x2, y2); }
+        ids.push(s.id); add('m' + q, { col, w: (1.45 - 0.5 * u) * ss, a: 0.95, dash: u < 0.55 ? [7, 2.2] : [3.2, 3.6] }, x1, y1, x2, y2); }
     }
     ctx.lineCap = 'round';
     // halo and fringe sit on the known-floor side only
@@ -54,9 +54,9 @@
     for (const b of G.values()) { ctx.strokeStyle = b.st.col; ctx.lineWidth = b.st.w; ctx.globalAlpha = b.st.a; ctx.lineCap = b.st.dash ? 'butt' : 'round'; ctx.setLineDash(b.st.dash || []); ctx.beginPath(); for (let i = 0; i < b.d.length; i += 4) { ctx.moveTo(b.d[i], b.d[i + 1]); ctx.lineTo(b.d[i + 2], b.d[i + 3]); } ctx.stroke(); }
     ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.lineCap = 'round';
     // ---- incident front: a broken pressure seam along the cells the wave is touching now ----
-    for (const w of snap.waves) { ctx.strokeStyle = C.fresh; ctx.lineWidth = 2.6; for (const q of w.pts) { const x = sx(q[0]), y = sy(q[1]), tx = q[2], ty = -q[3]; ctx.globalAlpha = 0.55 + 0.4 * q[4]; ctx.beginPath(); ctx.moveTo(x - tx * 3.6, y - ty * 3.6); ctx.lineTo(x + tx * 3.6, y + ty * 3.6); ctx.stroke(); } ctx.globalAlpha = 1; }
+    for (const w of (mem ? [] : snap.waves)) { ctx.strokeStyle = C.fresh; ctx.lineWidth = 2.6; for (const q of w.pts) { const x = sx(q[0]), y = sy(q[1]), tx = q[2], ty = -q[3]; ctx.globalAlpha = 0.55 + 0.4 * q[4]; ctx.beginPath(); ctx.moveTo(x - tx * 3.6, y - ty * 3.6); ctx.lineTo(x + tx * 3.6, y + ty * 3.6); ctx.stroke(); } ctx.globalAlpha = 1; }
     // ---- restrained particles: tiny motes lifting off freshly contacted faces, capped ----
-    let np = 0; if (opts.particles !== false) { ctx.fillStyle = C.chalk; for (const s of snap.segments) { if (s.ageTicks > 10 || np >= MAX_PARTICLES) continue; if (hash(s.id, (tick >> 1) + 7) > 0.18) continue; const u = s.ageTicks / 10, mx = (s.p[0] + s.p[2]) / 2, my = (s.p[1] + s.p[3]) / 2, ox = s.n[0] * u * 0.5, oy = s.n[1] * u * 0.5; ctx.globalAlpha = 0.7 * (1 - u); ctx.beginPath(); ctx.arc(sx(mx + ox), sy(my + oy), 1, 0, 7); ctx.fill(); np++; } ctx.globalAlpha = 1; }
+    let np = 0; if (opts.particles !== false && !mem) { ctx.fillStyle = C.chalk; for (const s of snap.segments) { if (s.ageTicks > 10 || np >= MAX_PARTICLES) continue; if (hash(s.id, (tick >> 1) + 7) > 0.18) continue; const u = s.ageTicks / 10, mx = (s.p[0] + s.p[2]) / 2, my = (s.p[1] + s.p[3]) / 2, ox = s.n[0] * u * 0.5, oy = s.n[1] * u * 0.5; ctx.globalAlpha = 0.7 * (1 - u); ctx.beginPath(); ctx.arc(sx(mx + ox), sy(my + oy), 1, 0, 7); ctx.fill(); np++; } ctx.globalAlpha = 1; }
     // ---- cast origins ----
     for (const o of snap.castOrigins) { const age = o.ageTicks / 30; scar(ctx, sx(o.origin[0]), sy(o.origin[1]), o.heardAgeTicks !== null ? 'heard' : age < 1.4 ? 'fresh' : 'mem', Math.max(0.25, 1 - Math.max(0, age - 5) / 3)); }
     // ---- creatures: sensed now, then a dissolving last-seen ghost. Never a live position. ----
@@ -64,8 +64,8 @@
     // ---- exit ----
     if (snap.knownExit) { const x = sx(snap.knownExit[0]), y = sy(snap.knownExit[1]); ctx.strokeStyle = C.exit; ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(x - 12, y + 12); ctx.lineTo(x - 12, y - 5); ctx.quadraticCurveTo(x - 12, y - 16, x, y - 16); ctx.quadraticCurveTo(x + 12, y - 16, x + 12, y - 5); ctx.lineTo(x + 12, y + 12); ctx.stroke(); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x, y - 16); ctx.lineTo(x, y + 12); ctx.stroke(); ctx.setLineDash([]); }
     // ---- you: always last, never under a halo ----
-    const px = sx(snap.player[0]), pyy = sy(snap.player[1]); ctx.strokeStyle = 'rgba(230,224,210,.22)'; ctx.lineWidth = 1; ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.arc(px, pyy - 3, 24, 0, 7); ctx.stroke(); ctx.setLineDash([]); listener(ctx, px, pyy - 3, C.chalk, 1.35);
-    return { segments: nseg, particles: np };
+    const px = sx(snap.player[0]), pyy = sy(snap.player[1]); ctx.strokeStyle = 'rgba(230,224,210,.22)'; ctx.lineWidth = 1; ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.arc(px, pyy - 3, 24, 0, 7); ctx.stroke(); ctx.setLineDash([]); listener(ctx, px, pyy - 3, C.chalk, band === 'close' ? 1.55 : mem ? 1.0 : 1.35);
+    return { segments: nseg, particles: np, ids, band };
   }
   window.ECHO_PLATE = { draw, colors: C };
 })();
