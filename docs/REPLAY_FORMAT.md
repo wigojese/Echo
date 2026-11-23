@@ -18,6 +18,9 @@ Seed plus tick-indexed inputs. Replaying must reproduce contours, heard events, 
 }
 ```
 
+- Optional `profile` (`"forgiving"`; absent means `suspense`) and `overrides` (listener numbers, tests and tools only) are read by `runReplay`. A replay must run with the profile it was recorded under.
+- Stage 13 sample replays may carry a `fixture` object with their own `level` and `geo`.
+- Event log (Stage 13): every event has `id` (sequential from 0, the `level_reset` marker is `-1`) and `cause` (an earlier event id or null). The log is deterministic, so a replay's event log is byte-identical to the live run.
 - `tick` is the 30 Hz simulation tick, never a frame number. Inputs for a tick are applied at the start of that tick.
 - `move` sets a steering vector (magnitude is clamped to 1, below 0.18 it is ignored) until the next `move` or `stop`.
 - `ping` carries no coordinates. The origin is the player position on that tick, and the event log records it. This changed from the Stage 07 draft, which had `x` and `y`.

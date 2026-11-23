@@ -1,6 +1,6 @@
 # ECHO project state
 
-Updated: 2026-11-22. Branch: `claude/keen-volta-mjk5nm`.
+Updated: 2026-11-23. Branch: `claude/keen-volta-mjk5nm`.
 
 ## Approval record (what the repository can actually prove)
 
@@ -12,12 +12,13 @@ Updated: 2026-11-22. Branch: `claude/keen-volta-mjk5nm`.
 - **Stage 09, input feel:** **Approved** as delivered (EC-D-016). No real phone was used and the primary scheme is still undecided (EC-D-013). See `docs/INPUT_SPEC.md`.
 - **Stage 10, phosphor visual system:** **Approved** as delivered (EC-D-019). Nothing engine-rendered. See `docs/STAGE10_VISUAL.md`.
 - **Stage 11, camera:** **Approved** as delivered (EC-D-023). The TRACE entry control is still open (EC-D-021). See `docs/STAGE11_CAMERA.md`.
-- **Stage 12, transitions:** delivered in the browser with 22 tests and 12 frame contracts, **no Godot, no phone**. See `docs/STAGE12_TRANSITIONS.md` and `docs/TRANSITIONS.md`.
+- **Stage 12, transitions:** **Approved** as delivered (EC-D-027, user: "approve and continue"). Browser only, no Godot, no phone. No signature transitions were named. See `docs/STAGE12_TRANSITIONS.md` and `docs/TRANSITIONS.md`.
+- **Stage 13, listener intelligence and causal replay:** delivered in Node and the browser with 55 tests, **no Godot, no phone**. Awaiting your approval. See `docs/STAGE13_PREDATOR.md`.
 - **Stage 06, engine and acoustic feasibility spike:** **Approved as delivered** by the user on 2026-11-22 (EC-D-005). The engine comparison stays **BLOCKED**, the solver reference is **tested**. See `docs/STAGE06_SPIKE.md`.
 
 ## Pending stage
 
-Stage 12, the eight signature transitions. Delivered in the browser, **awaiting your approval**. Stages 05 to 11 are approved.
+Stage 13, predator intelligence, fairness and causal replay. Delivered, **awaiting your approval**. Stages 05 to 12 are approved. Open decisions: EC-D-013 (movement scheme), EC-D-021 (TRACE entry), EC-D-028 (footstep noise) and EC-D-031 (suspense or forgiving).
 
 ## Pinned versions
 

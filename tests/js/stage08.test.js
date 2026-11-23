@@ -94,7 +94,8 @@ const noPred = (l) => { const c = clone(l); c.predators = []; return c; };
   check('26 camera firewall: different hidden predator positions give identical snapshots and framing for 300 ticks', same && JSON.stringify(A.pred[0].pos) !== JSON.stringify(B.pred[0].pos)); }
 // 27 explanation
 { const s = runReplay(L01, G01, RA), ex = s.explain(), h = kinds(s, 'heard_ping')[0];
-  check('27 the failure explanation quotes the logged echo id and tick, nothing else', ex.outcome === 'captured' && ex.sentence.includes(`echo ${h.payload.castId} at tick ${h.payload.arrivalTick}`), ex.sentence); }
+  const det = s.explainDetail(), hp = det && det.chain.find((c) => c.kind === 'heard_ping');
+  check('27 the failure explanation quotes the logged echo id and warning length, and the detail chain holds the logged tick (Stage 13 wording: no raw tick for the player)', ex.outcome === 'captured' && ex.sentence.includes(`echo ${h.payload.castId}`) && ex.sentence.includes((ex.facts.alertTicks / 30).toFixed(2) + ' s') && hp && hp.tick === h.payload.arrivalTick, ex.sentence); }
 // 28 outcomes
 { const a = runReplay(L01, G01, RA), b = runReplay(L01, G01, RB); check('28 one scripted run is caught and the other wins on the same level', a.state === 'CAPTURED' && b.state === 'WON', `${a.state} / ${b.state}`); }
 

@@ -6,6 +6,7 @@ extends RefCounted
 const PING_CAST := &"ping_cast"
 const WAVE_CONTACT := &"wave_contact"
 const HEARD_PING := &"heard_ping"
+const HEARD_STEP := &"heard_step"
 const PREDATOR_STATE_CHANGED := &"predator_state_changed"
 const PLAYER_CAPTURED := &"player_captured"
 const EXIT_REACHED := &"exit_reached"
@@ -17,6 +18,7 @@ const ALL: Array[StringName] = [
     PING_CAST,
     WAVE_CONTACT,
     HEARD_PING,
+    HEARD_STEP,
     PREDATOR_STATE_CHANGED,
     PLAYER_CAPTURED,
     EXIT_REACHED,

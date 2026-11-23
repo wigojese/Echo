@@ -31,11 +31,16 @@ var run_casts: Array[Dictionary] = []
 var pred_route: Array = []
 var _alert_start: int = -1
 var _exit_pos: Vector2 = Vector2.ZERO
+## Listener numbers for this run: a profile (&"suspense" is the approved rule set, &"forgiving" a proposal) plus optional overrides.
+var profile: StringName = &"suspense"
+var listener_params: Dictionary = {}
 
 
-func _init(level_data: Dictionary, geometry_data: Dictionary) -> void:
+func _init(level_data: Dictionary, geometry_data: Dictionary, opts: Dictionary = {}) -> void:
     level = level_data
     geometry = geometry_data
+    profile = StringName(opts.get("profile", &"suspense"))
+    listener_params = ListenerParams.profile(profile, opts.get("overrides", {}))
     var b: Array = level["world_bounds_metres"]
     grid = SoundGrid.from_strips(
         geometry["walkable_strips"],
@@ -77,7 +82,8 @@ func reset(first: bool = false) -> void:
         agent.position = Vector2(p["spawn_xy"][0], p["spawn_xy"][1])
         for w in p["patrol_waypoints"]:
             agent.waypoints.append(Vector2(w[0], w[1]))
-        agent.hearing_limit = float(p.get("hearing_cost_limit_m", AcousticFieldSolver.HEARING_LIMIT))
+        agent.params = listener_params
+        agent.hearing_limit = float(p.get("hearing_cost_limit_m", AcousticFieldSolver.HEARING_LIMIT)) * float(listener_params["hearing_scale"])
         predators.append(agent)
         pred_route.append([[agent.position.x, agent.position.y, 0]])
     var opening: float = float(level["rules"].get("opening_breath_m", 0.0))
@@ -117,6 +123,7 @@ func step(inputs: Array = []) -> void:
             fn.call()
         _scheduled.erase(t)
     knowledge.prune(t)
+    _footsteps(t)
     _active_casts = _active_casts.filter(func(c: Dictionary) -> bool: return t - int(c["tick"]) <= 50)
     for pr in predators:
         pr.step(t, grid, motion.position, _path_field, bus)
@@ -220,6 +227,7 @@ func _ping(t: int) -> void:
         t,
         {"cast_id": cast_id, "origin": origin, "edges": count, "cooldown_until": next_ping_tick}
     )
+    var cast_event := bus.last_id
     if count > 0:
         _schedule(first, func() -> void: bus.emit_event(SemanticEvents.WAVE_CONTACT, first, {"cast_id": cast_id, "edges": count, "first_tick": first, "last_tick": last}))
     var exit_cost: float = field[grid.cell_index(_exit_pos)]
@@ -232,7 +240,7 @@ func _ping(t: int) -> void:
         var arrive := t + ceili(pc / AcousticFieldSolver.PULSE_SPEED / SimClock.DT)
         _schedule(arrive, func() -> void: knowledge.record_sighting(pr.id, pr.position, arrive, true))
         if pc <= pr.hearing_limit:
-            _schedule(arrive, func() -> void: _on_heard(pr, cast_id, origin, pc, arrive))
+            _schedule(arrive, func() -> void: _on_heard(pr, cast_id, origin, pc, arrive, cast_event))
 
 
 func _check_exit(t: int) -> void:
@@ -246,23 +254,168 @@ func _check_exit(t: int) -> void:
         bus.emit_event(SemanticEvents.EXIT_REACHED, t, {"casts": cast_count, "ticks": t})
 
 
-## Built only from the event log.
+## Footsteps: a walking player is heard through connected floor within footstep_m. Quiet step is 70 percent fainter.
+## Standing still makes no sound. Sampled at 6 Hz, and a listener acts on a step at most once a second.
+func _footsteps(t: int) -> void:
+    if t % int(listener_params["step_interval_ticks"]) != 0:
+        return
+    if motion.velocity.length() < 0.3:
+        return
+    var reach := float(listener_params["footstep_m"]) * (float(listener_params["quiet_noise_factor"]) if motion.quiet else 1.0)
+    var field := PackedFloat64Array()
+    for pr in predators:
+        if pr.state == &"CHASE" or t - pr.last_step_tick < int(listener_params["step_repeat_ticks"]):
+            continue
+        if pr.position.distance_to(motion.position) > reach:
+            continue
+        if field.is_empty():
+            field = AcousticFieldSolver.solve(grid, motion.position, reach)
+        var c: float = field[grid.cell_index(pr.position)]
+        if is_inf(c) or c > reach:
+            continue
+        pr.hear_step(t, motion.position, c, reach, motion.quiet, bus)
+
+
+## The cause chain of an event, oldest first, found by following each event's cause back to its root.
+func cause_chain(terminal: Dictionary) -> Array:
+    var by_id := {}
+    for e in bus.history():
+        by_id[e["id"]] = e
+    var chain: Array = []
+    var e: Dictionary = terminal
+    var guard := 0
+    while not e.is_empty() and guard < 64:
+        chain.push_front(e)
+        var cause: int = e["cause"]
+        e = by_id[cause] if (cause >= 0 and by_id.has(cause)) else {}
+        guard += 1
+    return chain
+
+
+## Built only from the event log. What the player may be told straight after a round: echo numbers the player cast,
+## the warning length the player saw, and the player's OWN position against their OWN cast origin.
+## No listener position, route or timing of sight.
 func explain() -> Dictionary:
-    var hist := bus.history()
-    if state == &"CAPTURED":
-        for e in hist:
-            if e["kind"] == SemanticEvents.PLAYER_CAPTURED:
-                var c: Dictionary = e["payload"]
-                return {"outcome": "captured", "facts": c}
     if state == &"WON":
-        return {"outcome": "won", "echoes": cast_count}
+        var heard: Array = bus.history().filter(func(e: Dictionary) -> bool: return e["kind"] == SemanticEvents.HEARD_PING)
+        var s := "You reached the exit after %d echo%s." % [cast_count, "" if cast_count == 1 else "es"]
+        if not heard.is_empty():
+            s += " Echo %d drew the listener toward where you cast it." % int(heard[0]["payload"]["cast_id"])
+        return {"outcome": "won", "echoes": cast_count, "sentence": s}
     if state == &"TIMEOUT":
-        return {"outcome": "timeout"}
-    return {}
+        return {"outcome": "timeout", "sentence": "Time ran out. Retry starts from the same seed."}
+    if state != &"CAPTURED":
+        return {}
+    var cap := {}
+    for e in bus.history():
+        if e["kind"] == SemanticEvents.PLAYER_CAPTURED:
+            cap = e
+            break
+    var chain := cause_chain(cap)
+    var f: Dictionary = cap["payload"]
+    var warn := "%.2f" % (float(f["alert_ticks"]) / float(SimClock.HZ))
+    var root := {}
+    var chase := {}
+    var arrived := false
+    for e in chain:
+        if root.is_empty() and (e["kind"] == SemanticEvents.HEARD_PING or e["kind"] == SemanticEvents.HEARD_STEP):
+            root = e
+        if chase.is_empty() and e["kind"] == SemanticEvents.PREDATOR_STATE_CHANGED and e["payload"]["to"] == &"CHASE":
+            chase = e
+        if e["kind"] == SemanticEvents.PREDATOR_STATE_CHANGED and e["payload"]["to"] == &"SEARCH" and e["payload"].get("arrived", false):
+            arrived = true
+    var sentence := ""
+    var lesson := ""
+    var rule := "NONE"
+    if root.is_empty():
+        var doing := "returning to its route" if (not chase.is_empty() and chase["payload"]["from"] == &"RECOVER") else "patrolling"
+        sentence = "The listener saw you while it was %s and caught you after a %s s warning." % [doing, warn]
+        rule = "WALKED_INTO_VIEW"
+        lesson = "No sound drew it: you walked into its sight. An echo shows a listener for a moment, but it also hears the echo, so choose where you cast."
+    elif root["kind"] == SemanticEvents.HEARD_STEP:
+        sentence = "The listener heard your footsteps, walked to the spot, and found you after a %s s warning." % warn
+        rule = "HEARD_STEPS"
+        var quiet_heard := false
+        for e in bus.history():
+            if e["kind"] == SemanticEvents.HEARD_STEP and e["payload"]["quiet"]:
+                quiet_heard = true
+        lesson = "It heard you even on quiet step. Stand still to make no sound." if quiet_heard else "It heard you walk. Quiet step makes footsteps 70 percent fainter, and standing still makes none."
+    else:
+        var k: int = root["payload"]["cast_id"]
+        var near: float = (f["player_pos"] as Vector2).distance_to(root["payload"]["origin"])
+        if arrived:
+            sentence = "The listener heard echo %d, walked to where you cast it, and found you after a %s s warning." % [k, warn]
+        else:
+            sentence = "The listener heard echo %d, was on its way to where you cast it, and found you after a %s s warning." % [k, warn]
+        var since: int = int(chase["tick"]) - 12 * SimClock.HZ if not chase.is_empty() else int(cap["tick"]) - 12 * SimClock.HZ
+        var recent := 0
+        for e in bus.history():
+            if e["kind"] == SemanticEvents.HEARD_PING and int(e["tick"]) <= int(cap["tick"]) and int(e["tick"]) >= since:
+                recent += 1
+        if recent >= 3:
+            rule = "REPEATED_ECHOES"
+            lesson = "%d echoes in a row kept pulling it back. Each one tells a listener where to go." % recent
+        elif near <= 3.0:
+            rule = "STAYED_NEAR_ORIGIN"
+            lesson = "You were still %.1f m from where you cast echo %d. After an echo, move away from it: the listener walks to the origin." % [near, k]
+        else:
+            rule = "FOUND_ON_ROUTE"
+            lesson = "You were %.1f m from where you cast echo %d, but its search reached you. Echoes pull a listener toward the route you take next." % [near, k]
+    return {"outcome": "captured", "facts": f, "sentence": sentence, "lesson": lesson, "rule": rule}
 
 
-func _on_heard(pr: PredatorAgent, cast_id: int, origin: Vector2, cost: float, arrive: int) -> void:
-    pr.hear(cast_id, origin, cost, arrive, bus)
+## Post-round only: the full cause chain with numbers. The view may show it only after the player asks.
+func explain_detail() -> Dictionary:
+    if state == &"RUNNING":
+        return {}
+    var terminal := {}
+    for kind in [SemanticEvents.PLAYER_CAPTURED, SemanticEvents.EXIT_REACHED, SemanticEvents.LEVEL_TIMEOUT]:
+        for e in bus.history():
+            if e["kind"] == kind:
+                terminal = e
+                break
+        if not terminal.is_empty():
+            break
+    if terminal.is_empty():
+        return {}
+    var out: Array = []
+    for e in cause_chain(terminal):
+        out.append({"id": e["id"], "tick": e["tick"], "kind": e["kind"], "cause": e["cause"], "text": _describe(e)})
+    return {"terminal": terminal["kind"], "chain": out}
+
+
+func _describe(e: Dictionary) -> String:
+    var p: Dictionary = e["payload"]
+    var secs := func(ticks: int) -> String: return "%.2f s" % (float(ticks) / float(SimClock.HZ))
+    match e["kind"]:
+        SemanticEvents.PING_CAST:
+            var o: Vector2 = p["origin"]
+            return "You cast echo %d at (%.1f, %.1f)." % [p["cast_id"], o.x, o.y]
+        SemanticEvents.HEARD_PING:
+            return "The listener heard echo %d, %.1f m of floor away, %s into the run." % [p["cast_id"], p["weighted_cost"], secs.call(e["tick"])]
+        SemanticEvents.HEARD_STEP:
+            return "The listener heard your %sfootsteps %.1f m away." % ["quiet " if p["quiet"] else "", p["weighted_cost"]]
+        SemanticEvents.PREDATOR_STATE_CHANGED:
+            match p["to"]:
+                &"CHASE":
+                    return "It saw you %.1f m away. The warning began, and a capture needs at least %s of it." % [p["sight"]["distance"], secs.call(int(listener_params["alert_ticks"]))]
+                &"CURIOUS":
+                    return "It turned toward the spot where it heard you walk." if p["reason"] == "heard footsteps" else "It turned toward where echo %s was cast." % String(p["reason"]).replace("heard ping ", "")
+                &"SEARCH":
+                    if p["from"] == &"CHASE":
+                        return "It lost sight of you for %.1f s and began to search." % (float(p["lost_ticks"]) / float(SimClock.HZ))
+                    return "It reached the spot and looked around." if p.get("arrived", false) else "It gave up walking after 7 s and looked around."
+                &"RECOVER":
+                    return "It finished searching and started back to its route."
+                _:
+                    return "It was back on its route."
+        SemanticEvents.PLAYER_CAPTURED:
+            return "It reached you %s into the warning." % secs.call(int(p["alert_ticks"]))
+    return String(e["kind"])
+
+
+func _on_heard(pr: PredatorAgent, cast_id: int, origin: Vector2, cost: float, arrive: int, cause_id: int) -> void:
+    pr.hear(cast_id, origin, cost, arrive, cause_id, bus)
     knowledge.mark_heard(cast_id, arrive)
 
 

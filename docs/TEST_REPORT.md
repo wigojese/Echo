@@ -1,25 +1,29 @@
 # Test report
 
-Updated 2026-11-23. Host: v22.23.5, Intel(R) Xeon(R) Processor @ 2.30GHz, linux/x64. Godot: **not installed, GDScript never executed**. No phone was used.
+Updated 2026-11-23. Host: v22.23.5, Intel(R) Xeon(R) Processor @ 2.10GHz, linux/x64. Godot: **not installed, GDScript never executed**. No phone was used.
+
+_Rebuilt by `node tools/test_report.js`, which runs each suite and pastes its output._
 
 ## Status labels
 
 | Item | Label |
 |---|---|
 | Acoustic solver reference, 13 tests | IMPLEMENTED/TESTED |
+| Level validator, firewall scanner, style tokens, 17 tests | IMPLEMENTED/TESTED |
 | Reference simulation, 31 tests | IMPLEMENTED/TESTED |
 | Input router, planner and control modes, 30 tests | IMPLEMENTED/TESTED |
 | Camera director, 20 tests | IMPLEMENTED/TESTED |
 | Gesture conflicts, 20 tests | IMPLEMENTED/TESTED |
 | Transitions, 22 tests | IMPLEMENTED/TESTED |
-| Level validator, firewall scanner, style tokens, 17 checks | IMPLEMENTED/TESTED |
+| Listener intelligence, fairness and causal replay, 55 tests | IMPLEMENTED/TESTED |
 | Pixel-level render contracts, 18 checks (browser, software rendering) | IMPLEMENTED/TESTED, **not Godot** |
 | Rendered-frame transition contracts, 12 checks (browser) | IMPLEMENTED/TESTED, **not Godot** |
 | Emulated touch audit and input timing (headless Chromium) | EMULATED, not a phone |
-| GDScript syntax, 22 files, gdtoolkit 4.5.0 | IMPLEMENTED/TESTED, **syntax only** |
-| GDScript unit tests in `tests/run_tests.gd` | **BLOCKED/UNVERIFIED**, never run |
+| GDScript syntax, 23 files, gdtoolkit 4.5.0 | IMPLEMENTED/TESTED, **syntax only** |
+| GDScript unit tests in `tests/run_tests.gd` (including the Stage 13 ones) | **BLOCKED/UNVERIFIED**, never run |
 | Engine-rendered screenshots, shaders, in-engine recording | **BLOCKED**, no Godot |
 | Haptics, real sound, finger feel, real-screen flash safety and brightness | **BLOCKED/UNVERIFIED**, no device |
+| Any claim about how a person plays EC-L01 | **BLOCKED/UNVERIFIED**. Strategy sweeps are authored scripts, not people |
 
 Manual test to close the Godot gap, on a machine with Godot 4.7:
 
@@ -44,10 +48,10 @@ PASS  determinism: two runs give bit-identical cost fields
 PASS  hearing: ping at the fork is heard by the listener  cost=7.93 m, arrives 0.88 s after cast
 PASS  hearing: ping at spawn is not heard  cost=Infinity
 PASS  origin: field is rooted at the cast position (cost 0 there, 3.5 m to where the player went)  cost to later position=3.50
-BENCH L01 at 0.25 m cells: p50=0.446 ms  p95=0.687 ms  max=1.052 ms  (n=300, cells=13824)
-BENCH L01 at 0.20 m cells: p50=0.751 ms  p95=1.096 ms  max=1.445 ms  (n=300, cells=21600)
+BENCH L01 at 0.25 m cells: p50=0.546 ms  p95=0.852 ms  max=1.195 ms  (n=300, cells=13824)
+BENCH L01 at 0.20 m cells: p50=1.019 ms  p95=1.687 ms  max=2.874 ms  (n=300, cells=21600)
 
-HOST node v22.23.5, Intel(R) Xeon(R) Processor @ 2.30GHz, 4 logical CPUs, linux/x64
+HOST node v22.23.5, Intel(R) Xeon(R) Processor @ 2.10GHz, 4 logical CPUs, linux/x64
 RESULT 13 passed, 0 failed
 ```
 
@@ -104,7 +108,7 @@ PASS  23 pause freezes the world and resuming matches an unpaused run
 PASS  24 the 90 s soft timeout ends the level with a retry-friendly result  ended at tick 2700
 PASS  25 only semantic events are ever logged, and an unknown event is rejected
 PASS  26 camera firewall: different hidden predator positions give identical snapshots and framing for 300 ticks
-PASS  27 the failure explanation quotes the logged echo id and tick, nothing else  The listener heard echo 1 at tick 537, walked to where it was cast, and found you after a 1.90 s warning.
+PASS  27 the failure explanation quotes the logged echo id and warning length, and the detail chain holds the logged tick (Stage 13 wording: no raw tick for the player)  The listener heard echo 1, was on its way to where you cast it, and found you after a 1.90 s warning.
 PASS  28 one scripted run is caught and the other wins on the same level  CAPTURED / WON
 RESULT 31 passed, 0 failed
 ```
@@ -212,13 +216,74 @@ PASS  13 failure: the scene dims on its own, but the real route is drawn only af
 PASS  14 success: the replay uses only your own run (2 echoes, the route you walked) and the line draws entry to exit then retracts  ink at half time 0.42
 PASS  15 the transitions never change the simulation: the event log is identical with and without them
 PASS  16 the origin scar is on the plate in the first snapshot after the cast (at most one tick old), and every front sample sits within 0.1 m of the solver front  scar age 1 tick, 291 samples, worst 0.1000 m
-PASS  17 the transition director costs under 0.05 ms per frame  0.42 microseconds per frame, Node 22
+PASS  17 the transition director costs under 0.05 ms per frame  0.72 microseconds per frame, Node 22
 PASS  18 the pullback pushes in to 1.05, then pulls to 0.72 without overshoot or a jump  peak 1.050, end 0.720, biggest step 0.050
 PASS  19 steering ends the opening breath at once, and the wordmark transition runs only the first time
 PASS  20 each transition emits its sound and haptic pairing the moment it starts
 PASS  21 with the threat zoom and the camera nudge on, touch still maps to the world exactly (500 random cameras)  worst error 7.3e-15 m
 PASS  22 docs/TRANSITIONS.md matches the specs in the code exactly  run `node tools/transitions/gen_docs.js --write` after changing a spec
 RESULT 22 passed, 0 failed
+```
+
+### `node tests/js/stage13.test.js`
+```
+PASS  S13-01 default profile equals the approved listener numbers (speeds 1.1/1.45/1.85, sight 4 m for 6 ticks, warning 18 ticks, capture 0.5 m for 6 ticks, curious 7 s, search 2.5 s, lose 1.7 s, hearing 11)
+PASS  S13-02 the master prompt minimums hold in BOTH profiles: warning at least 0.60 s, sight at least 0.18 s
+PASS  S13-04 hearing an old origin: the listener walks to where the echo was cast, not to where you are now  phase 0: at the origin within 0.49 m, player 9.6 m away
+PASS  S13-04b the same run: no chase, the echo cost the listener a trip and the player the exit
+PASS  S13-04c the heard event is caused by the cast, and the state change by the heard event
+PASS  S13-05 seeing the current player: no echo, line of sight at 4 m or less for 6 ticks starts the chase  chase at tick 5
+PASS  S13-05b sight must last 6 ticks: the chase begins on the sixth tick of contact, not the first  chase tick 5
+PASS  S13-05c flickering contact (never 6 ticks in a row) never starts a chase
+PASS  S13-06 sealed wall: 24 echoes and 30 s walking 3.2 m from a patrolling listener cause no hearing, no state change, no ghost  echoes 1
+PASS  S13-06b even with footstep reach raised to 8 m, a wall 0.8 m thick stops the sound
+PASS  S13-06c negative control: add a connecting doorway and the same inputs are heard, so the test can fail  heard 1
+PASS  S13-06d hairpin corner: positions within 4 m through a wall (no line of sight) never start a chase, and positions in sight do  41 blocked positions (0 chased), 28 visible positions (28 chased)
+PASS  S13-07 point blank: you are already inside capture range yet the capture waits for the full 0.60 s warning  chase tick 5, capture tick 23
+PASS  S13-07b from first sight to capture takes at least 0.20 s of contact plus 0.60 s of warning  0.77 s
+PASS  S13-07c the forgiving profile lengthens the warning to 0.90 s  27 ticks
+PASS  S13-07d telegraph: the alert is in the snapshot on every chase tick before the capture, and only then  18/18 chase ticks
+PASS  S13-07e the alert carries an age and nothing else, so it cannot show where the listener is
+PASS  S13-07f every sampled capture in the strategy sweeps has at least an 18 tick warning and a chase in its cause chain  6 captures, shortest warning 20 ticks
+PASS  S13-08 lost sight: with no contact, the chase becomes a search after exactly 1.7 s (51 ticks)  lost at tick 62, last seen 11
+PASS  S13-08b the search event is caused by the chase event
+PASS  S13-08c the search lasts exactly 2.5 s (75 ticks) before it recovers  75 ticks
+PASS  S13-08d recover walks it back to its route and it patrols again
+PASS  S13-09 a second echo from a new place updates the remembered origin and restarts the investigation timer  dest 4.5,5.0
+PASS  S13-09b the second hearing does not make a second CURIOUS state change (it was already curious)
+PASS  S13-10 it walks to an old origin although you are gone, searches there, and returns to its route  search at tick 206, patrol again at 501
+PASS  S13-10b after it recovers it never goes back to that origin without a new sound  closest return 8.9 m
+PASS  S13-10c the remembered origin is kept for the explanation only, and the patrol target is not it
+PASS  S13-10d a sound heard from 11 m is investigated for at most 7 s, so the listener searches about 0.9 m short of the origin  stopped 0.79 m from the origin
+PASS  S13-11 walking is heard by a listener 6 m away; quiet step (30 percent of that reach) is not  walking heard at tick 100, quiet not heard before sight
+PASS  S13-11b quiet reaches 30 percent: reach 1.8 m against 6.0 m
+PASS  S13-11c standing still makes no footstep sound at 2.5 m of floor; sight (6 ticks) is what finds you
+PASS  S13-11d a ping is just as loud under quiet step: same hearing cost and arrival tick
+PASS  S13-11e finding to report: on EC-L01 at the default 2.5 m, sight (4 m) shadows footsteps, so quiet step is only slower  8 footstep hearings across 488 runs
+PASS  S13-12 every cause points at an earlier logged event, in every sampled capture  6 captures, 18 chain events
+PASS  S13-12b chains start at a cast, a footstep or the sight itself, never at nothing  predator_state_changed, ping_cast
+PASS  S13-12c event ids are unique and sequential from 0, and every event kind is semantic
+PASS  S13-13 the sentence names the echo the log says the listener heard and the warning length the log recorded  The listener heard echo 1, was on its way to where you cast it, and found you after a 1.90 s warning.
+PASS  S13-13b the detail chain runs cast, heard, curious, chase, capture in order  ping_cast > heard_ping > state > state > player_captured
+PASS  S13-13c the sentence and lesson are identical when the listener route and final position are tampered with
+PASS  S13-13d no listener coordinate appears in the sentence or lesson
+PASS  S13-13e while the round is running, the detail, the reveal and the summary all return nothing
+PASS  S13-14 fixture: casting again and again from one spot is named REPEATED_ECHOES, from three or more heard echoes in 12 s  REPEATED_ECHOES | 6 echoes in a row kept pulling it back. Each one tells a listener where to go.
+PASS  S13-14b fixture: being heard walking and then standing still is named HEARD_STEPS  HEARD_STEPS | The listener heard your footsteps, walked to the spot, and found you after a 1.90 s warning.
+PASS  S13-14c all five capture rules have been produced by a run: FOUND_ON_ROUTE, HEARD_STEPS, REPEATED_ECHOES, STAYED_NEAR_ORIGIN, WALKED_INTO_VIEW
+PASS  S13-14d STAYED_NEAR_ORIGIN quotes the distance from your own position to your own cast origin, as the log has it  You were still 0.1 m from where you cast echo 1. After an echo, move away from it: the listener walks to the origin.
+PASS  S13-14e every captured sample has a lesson and a rule id from the closed list
+PASS  S13-15 every failure sample (L01 and fixture) replays to a byte-identical event log and a capture  5/5: WALKED_INTO_VIEW, FOUND_ON_ROUTE, STAYED_NEAR_ORIGIN, REPEATED_ECHOES, HEARD_STEPS
+PASS  S13-15b a forgiving-profile replay carries its profile and reproduces
+PASS  S13-16 at least five different strategies win EC-L01, using 0, 1, 3 and 6 echoes  navigator, bait, blind, patient, six, junction, quiet
+PASS  S13-16b none of the winning strategies is a certain win or a certain loss across start phases except the two bookends
+PASS  S13-16c every strategy is open loop: each plan contains only moves, echoes, waits and quiet toggles (nothing reads the listener)
+PASS  S13-16d the forgiving profile never captures more often than suspense on any strategy, and strictly fewer overall  38 vs 123 captures
+PASS  S13-17 every observed state change is a declared edge of the transition diagram  11 distinct edges seen
+PASS  S13-17b every declared edge is exercised by a run or a fixture (11 edges)  11/11
+PASS  S13-17c an undeclared transition throws instead of being logged
+
+RESULT 55 passed, 0 failed
 ```
 
 ### `cat reference/evidence/render-contracts.txt`
@@ -236,7 +301,7 @@ PASS  C5 the Echo label has at least 4.5:1 contrast against its button  14.9:1
 PASS  C6 the grain is world-anchored: it moves with the world, not the screen  error after the matching shift x=0.000 y=0.000, error with no shift 0.44
 PASS  C7 budgets over a full run: at most 200 particles, 1,500 contour segments, 2 overlapping waves  max particles 30, max segments 451, max waves 1
 PASS  C7b pinging as fast as the cooldown allows: never more than 2 waves, 200 particles or 1,500 segments  waves 2, particles 17, segments 196
-PERF render() plus raster flush, headless Chromium software rendering on a server CPU, replay B at tick 520 (not a phone): graybox p50 0.40 ms p95 0.50 ms | plate p50 3.40 ms p95 3.90 ms | delta p50 3.00 ms
+PERF render() plus raster flush, headless Chromium software rendering on a server CPU, replay B at tick 520 (not a phone): graybox p50 0.50 ms p95 0.60 ms | plate p50 3.80 ms p95 5.70 ms | delta p50 3.30 ms
 PASS  C8 close view (zoom 1.60): every lit pixel is next to something the player knows  band close, lit samples 257, unexplained 0, segments drawn 148
 PASS  C8 active view (zoom 1.00): every lit pixel is next to something the player knows  band active, lit samples 226, unexplained 0, segments drawn 148
 PASS  C8 memory view (zoom 0.70): every lit pixel is next to something the player knows  band memory, lit samples 132, unexplained 0, segments drawn 148
@@ -249,16 +314,16 @@ RESULT 18 passed, 0 failed
 ```
 PASS  T4 starts when a creature or heard echo is newly drawn
 PASS  T6 starts at the alert and the edge stays steady afterwards
-MEASURE T1 wordmark + T2 opening breath: 60 frames, worst luminance swing in any second 2.43 percent of white, biggest frame to frame step 0.31, brightest pixel 225/255, render+raster p50 4.50 ms p95 7.20 ms
-MEASURE T3 cast aperture and front: 24 frames, worst luminance swing in any second 0.00 percent of white, biggest frame to frame step 0.00, brightest pixel 224/255, render+raster p50 3.10 ms p95 4.90 ms
-MEASURE T4 known-contact nudge: 48 frames, worst luminance swing in any second 0.19 percent of white, biggest frame to frame step 0.06, brightest pixel 224/255, render+raster p50 6.60 ms p95 8.20 ms
-MEASURE T6 threat encounter (1.5 s): 90 frames, worst luminance swing in any second 0.44 percent of white, biggest frame to frame step 0.16, brightest pixel 224/255, render+raster p50 5.00 ms p95 6.90 ms
-MEASURE T7 failure dim then reveal: 64 frames, worst luminance swing in any second 2.38 percent of white, biggest frame to frame step 2.32, brightest pixel 224/255, render+raster p50 4.20 ms p95 5.90 ms
-MEASURE T8 success reconstruction: 50 frames, worst luminance swing in any second 0.31 percent of white, biggest frame to frame step 0.06, brightest pixel 224/255, render+raster p50 3.40 ms p95 3.60 ms
-MEASURE T5 memory pullback: 30 frames, worst luminance swing in any second 0.26 percent of white, biggest frame to frame step 0.14, brightest pixel 224/255, render+raster p50 3.90 ms p95 5.30 ms
+MEASURE T1 wordmark + T2 opening breath: 60 frames, worst luminance swing in any second 2.43 percent of white, biggest frame to frame step 0.31, brightest pixel 225/255, render+raster p50 4.30 ms p95 8.50 ms
+MEASURE T3 cast aperture and front: 24 frames, worst luminance swing in any second 0.00 percent of white, biggest frame to frame step 0.00, brightest pixel 224/255, render+raster p50 3.20 ms p95 6.10 ms
+MEASURE T4 known-contact nudge: 48 frames, worst luminance swing in any second 0.19 percent of white, biggest frame to frame step 0.06, brightest pixel 224/255, render+raster p50 5.20 ms p95 6.50 ms
+MEASURE T6 threat encounter (1.5 s): 90 frames, worst luminance swing in any second 0.44 percent of white, biggest frame to frame step 0.16, brightest pixel 224/255, render+raster p50 6.00 ms p95 8.80 ms
+MEASURE T7 failure dim then reveal: 64 frames, worst luminance swing in any second 2.43 percent of white, biggest frame to frame step 2.38, brightest pixel 224/255, render+raster p50 5.40 ms p95 9.10 ms
+MEASURE T8 success reconstruction: 50 frames, worst luminance swing in any second 0.31 percent of white, biggest frame to frame step 0.06, brightest pixel 224/255, render+raster p50 5.70 ms p95 6.10 ms
+MEASURE T5 memory pullback: 30 frames, worst luminance swing in any second 0.26 percent of white, biggest frame to frame step 0.14, brightest pixel 224/255, render+raster p50 4.60 ms p95 8.70 ms
 PASS  F1 no transition swings the screen luminance by anything near a general flash (limit 10 percent of white in any second)  worst 2.43 percent
 PASS  F2 no transition ever draws a pure-white pop: the brightest pixel stays at palette chalk or below (235 of 255)  brightest 225
-PASS  F3 the strongest single frame-to-frame change is under 5 percent of white  worst 2.32 percent
+PASS  F3 the strongest single frame-to-frame change is under 5 percent of white  worst 2.38 percent
 PASS  X1 before Reveal the failure screen is byte-identical even if the hidden listener route is tampered with
 PASS  X2 after Reveal the route is drawn, so the tampered and untampered pictures differ (the test can fail)
 PASS  X3 the threat edge is non-positional: moving the listener 3 m in the simulation changes no pixel
@@ -289,6 +354,11 @@ FIREWALL OK: no view-layer script references ground truth
 LEVEL OK: EC-L01
 ```
 
+### `node tools/predator/gen_docs.js --check`
+```
+generated files match the code
+```
+
 ### GDScript parse
 ```
 parsed ok  game/scenes/bootstrap/boot.gd
@@ -308,6 +378,7 @@ parsed ok  game/scripts/knowledge/knowledge_gate.gd
 parsed ok  game/scripts/knowledge/knowledge_store.gd
 parsed ok  game/scripts/knowledge/visible_world_snapshot.gd
 parsed ok  game/scripts/player/motion_controller.gd
+parsed ok  game/scripts/predator/listener_params.gd
 parsed ok  game/scripts/predator/predator_agent.gd
 parsed ok  game/scripts/rendering/pulse_renderer.gd
 parsed ok  game/scripts/rendering/style_tokens.gd

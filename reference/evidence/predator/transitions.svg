@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 520" font-family="Inter,Arial,sans-serif"><rect width="820" height="520" fill="#0b0d0b"/>
+<defs><marker id="aC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#cfc9b6"/></marker><marker id="aA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#d9a441"/></marker></defs>
+<text x="24" y="30" fill="#cfc9b6" font-size="19" font-family="Georgia,serif">Listener state machine</text>
+<text x="24" y="48" fill="#8f8b7c" font-size="11.5">Drawn from LISTENER_EDGES in reference/sim/sim.js. Solid cream is sound or a timer. Amber is sight and the chase.</text>
+<path d="M168 190 L232 190" fill="none" stroke="#cfc9b6" stroke-width="1.6" marker-end="url(#aC)"/><text x="200" y="170" fill="#cfc9b6" font-size="11.5" text-anchor="middle">heard ping</text><text x="200" y="183" fill="#cfc9b6" font-size="11.5" text-anchor="middle">or step</text>
+<path d="M378 190 L442 190" fill="none" stroke="#cfc9b6" stroke-width="1.6" marker-end="url(#aC)"/><text x="410" y="170" fill="#cfc9b6" font-size="11.5" text-anchor="middle">arrived,</text><text x="410" y="183" fill="#cfc9b6" font-size="11.5" text-anchor="middle">or 7 s</text>
+<path d="M588 190 L652 190" fill="none" stroke="#cfc9b6" stroke-width="1.6" marker-end="url(#aC)"/><text x="620" y="170" fill="#cfc9b6" font-size="11.5" text-anchor="middle">2.5 s</text>
+<path d="M725 159 C725 62, 95 62, 95 159" fill="none" stroke="#cfc9b6" stroke-width="1.6" marker-end="url(#aC)"/>
+<text x="410" y="78" fill="#cfc9b6" font-size="11.5" text-anchor="middle">back on its route</text>
+<path d="M695 159 C695 112, 335 112, 335 159" fill="none" stroke="#cfc9b6" stroke-width="1.6" marker-end="url(#aC)"/>
+<text x="515" y="120" fill="#cfc9b6" font-size="11.5" text-anchor="middle">new sound</text>
+<path d="M490 221 C490 268, 330 268, 330 221" fill="none" stroke="#cfc9b6" stroke-width="1.6" marker-end="url(#aC)"/>
+<text x="410" y="276" fill="#cfc9b6" font-size="11.5" text-anchor="middle">new sound</text>
+<rect x="25" y="352" width="770" height="58" rx="3" fill="#10130f" stroke="#d9a441" stroke-width="2.2"/>
+<text x="410" y="378" fill="#d9a441" font-size="17" text-anchor="middle" font-family="Georgia,serif" letter-spacing="2">CHASE</text>
+<text x="410" y="397" fill="#8f8b7c" font-size="11.5" text-anchor="middle">1.85 m/s. Capture only after 0.60 s of warning and 0.20 s within 0.5 m, with sight.</text>
+<path d="M70 221 L70 349" fill="none" stroke="#d9a441" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#aA)"/>
+<path d="M260 221 L260 349" fill="none" stroke="#d9a441" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#aA)"/>
+<path d="M493 221 L493 349" fill="none" stroke="#d9a441" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#aA)"/>
+<path d="M725 221 L725 349" fill="none" stroke="#d9a441" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#aA)"/>
+<rect x="110" y="293" width="290" height="20" fill="#0b0d0b"/>
+<text x="255" y="307" fill="#d9a441" font-size="11.5" text-anchor="middle">sight within 4 m for 0.20 s, from any calm state</text>
+<path d="M555 349 L555 221" fill="none" stroke="#d9a441" stroke-width="1.6" marker-end="url(#aA)"/>
+<text x="563" y="305" fill="#d9a441" font-size="11.5" text-anchor="start">no sight</text>
+<text x="563" y="319" fill="#d9a441" font-size="11.5" text-anchor="start">for 1.7 s</text>
+<rect x="25" y="162" width="140" height="56" rx="3" fill="#10130f" stroke="#cfc9b6" stroke-width="1.4"/><text x="95" y="187" fill="#cfc9b6" font-size="15" text-anchor="middle" font-family="Georgia,serif" letter-spacing="1.5">PATROL</text><text x="95" y="205" fill="#8f8b7c" font-size="11" text-anchor="middle">1.10 m/s</text>
+<rect x="235" y="162" width="140" height="56" rx="3" fill="#10130f" stroke="#cfc9b6" stroke-width="1.4"/><text x="305" y="187" fill="#cfc9b6" font-size="15" text-anchor="middle" font-family="Georgia,serif" letter-spacing="1.5">CURIOUS</text><text x="305" y="205" fill="#8f8b7c" font-size="11" text-anchor="middle">1.45 m/s</text>
+<rect x="445" y="162" width="140" height="56" rx="3" fill="#10130f" stroke="#cfc9b6" stroke-width="1.4"/><text x="515" y="187" fill="#cfc9b6" font-size="15" text-anchor="middle" font-family="Georgia,serif" letter-spacing="1.5">SEARCH</text><text x="515" y="205" fill="#8f8b7c" font-size="11" text-anchor="middle">stands still</text>
+<rect x="655" y="162" width="140" height="56" rx="3" fill="#10130f" stroke="#cfc9b6" stroke-width="1.4"/><text x="725" y="187" fill="#cfc9b6" font-size="15" text-anchor="middle" font-family="Georgia,serif" letter-spacing="1.5">RECOVER</text><text x="725" y="205" fill="#8f8b7c" font-size="11" text-anchor="middle">1.10 m/s</text>
+<text x="24" y="470" fill="#8f8b7c" font-size="12" text-anchor="start">Capture ends the round from CHASE. It is not a state a listener can enter any other way.</text>
+<text x="24" y="488" fill="#8f8b7c" font-size="12" text-anchor="start">The simulation throws on any change not in this table (test S13-17c).</text>
+</svg>

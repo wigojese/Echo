@@ -400,3 +400,62 @@ func test_camera_mapping_with_transient_effects() -> void:
     var s := CameraDirector.world_to_screen(w, f["center"], cam.px_per_m())
     var back := CameraDirector.screen_to_world(s, f["center"], cam.px_per_m())
     _check("camera: with the threat zoom and a nudge on, touch still maps to the world exactly", back.distance_to(w) < 0.000001)
+
+
+## Stage 13. UNVERIFIED until run in Godot 4.7: mirrors tests/js/stage13.test.js for the rules a port can break silently.
+func _fixture_sim(strips: Array, spawn: Array, pred_pos: Array, opts: Dictionary = {}) -> Simulation:
+    var level := {
+        "id": "EC-T-S13", "seed": 13, "world_bounds_metres": [0, 0, 24, 36],
+        "player": {"spawn_xy": spawn}, "goal": {"exit_xy": [23, 35]}, "rules": {"acoustic_cell_m": 0.25},
+        "predators": [{"id": "listener-01", "spawn_xy": pred_pos, "patrol_waypoints": [pred_pos, [pred_pos[0] + 0.01, pred_pos[1]]], "hearing_cost_limit_m": 14.0}],
+    }
+    return Simulation.new(level, {"half_width_m": 1.2, "walkable_strips": strips}, opts)
+
+
+func test_stage13_event_ids_and_causes() -> void:
+    var sim := _fixture_sim([[2, 5, 22, 5]], [4, 5], [14, 5])
+    sim.step([{"type": "ping"}])
+    for i in range(400):
+        sim.step()
+    var ids_ok := true
+    var by_id := {}
+    for e in sim.bus.history():
+        if e["kind"] == SemanticEvents.LEVEL_RESET:
+            continue
+        by_id[e["id"]] = e
+    for e in by_id.values():
+        if e["cause"] >= 0 and not (by_id.has(e["cause"]) and int(by_id[e["cause"]]["tick"]) <= int(e["tick"])):
+            ids_ok = false
+    var heard: Array = sim.bus.history().filter(func(e: Dictionary) -> bool: return e["kind"] == SemanticEvents.HEARD_PING)
+    _check("stage13: every cause names an earlier logged event, and a heard ping is caused by its cast", ids_ok and not heard.is_empty() and by_id[heard[0]["cause"]]["kind"] == SemanticEvents.PING_CAST)
+
+
+func test_stage13_capture_waits_for_the_warning() -> void:
+    var sim := _fixture_sim([[2, 5, 22, 5]], [9.7, 5], [10, 5])
+    for i in range(200):
+        sim.step()
+    var chase_tick := -1
+    var cap_tick := -1
+    for e in sim.bus.history():
+        if e["kind"] == SemanticEvents.PREDATOR_STATE_CHANGED and e["payload"]["to"] == &"CHASE":
+            chase_tick = int(e["tick"])
+        if e["kind"] == SemanticEvents.PLAYER_CAPTURED:
+            cap_tick = int(e["tick"])
+    _check("stage13: point blank, the capture still waits the full 18 tick warning", chase_tick >= 0 and cap_tick - chase_tick == 18)
+
+
+func test_stage13_profiles_keep_the_minimums() -> void:
+    for name in [&"suspense", &"forgiving"]:
+        var p := ListenerParams.profile(name)
+        _check("stage13: %s keeps at least a 0.60 s warning and 0.18 s of sight" % name, int(p["alert_ticks"]) >= 18 and int(p["contact_ticks"]) >= 6)
+    _check("stage13: suspense is the approved set", ListenerParams.profile(&"suspense")["chase_speed"] == 1.85)
+
+
+func test_stage13_explanation_comes_from_the_log() -> void:
+    var sim := _fixture_sim([[2, 5, 22, 5]], [4, 5], [14, 5])
+    sim.step([{"type": "ping"}])
+    for i in range(1500):
+        sim.step()
+    var ex := sim.explain()
+    _check("stage13: a capture after an echo is explained from that echo, with a rule id", ex.get("outcome", "") == "captured" and String(ex["sentence"]).contains("echo 1") and ex["rule"] == "STAYED_NEAR_ORIGIN")
+    _check("stage13: the detail is empty while a round is running", _fixture_sim([[2, 5, 22, 5]], [4, 5], [14, 5]).explain_detail().is_empty())

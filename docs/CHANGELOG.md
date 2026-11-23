@@ -39,3 +39,14 @@
 
 - Correction: the Stage 11 note about a latency regression and fix was an artefact of a phase-locked audit. The latency audit now jitters its timing and reports three runs. No build-to-build latency difference is established (run-to-run spread about 15 ms).
 - Trigger watcher uses a cheap view (`watchSnapshot`) instead of a full snapshot each frame.
+
+## 2026-11-23, Stage 13
+- Stage 12 approved ("approve and continue"). No signature transitions were named.
+- Reference simulation: every event has an id and a cause, the listener state machine is a declared table that throws on an undeclared change, listener numbers move into two profiles, footstep noise is modelled, and the explanation is built by walking the cause chain.
+- `explain()` changed wording. It no longer prints a raw tick, and it says "was on its way" when the listener saw you before it reached the origin. Test 27 in the Stage 08 suite was updated to check the echo id and warning length in the sentence and the logged tick in the detail chain.
+- New: `tests/js/stage13.test.js` (55 tests), `tools/strategies/`, `tools/predator/` (diagram, failure samples, strategy tables, screenshots), `docs/PREDATOR.md`, `docs/FAILURE_SAMPLES.md`, `docs/STRATEGIES.md`, `docs/STAGE13_PREDATOR.md`.
+- Graybox: failure sheet shows a lesson; the Reveal view lists the cause chain, veils the world behind the map and keeps labels on screen; `?profile=forgiving`.
+- Wrong test premises found and fixed while writing the new tests, never by relaxing a rule: the chase fixture put the listener 6.5 m away; the hairpin fixture had no near-but-walled positions; two fixtures left the player standing where the listener was heading; the 7 s investigation limit stops a listener 0.8 m short of an origin heard from 11 m (a designed edge, now tested and documented).
+- Found that quiet step is a pure speed penalty on EC-L01 with the prompt's numbers (EC-D-028).
+- GDScript port: event ids and causes, `heard_step`, `ListenerParams`, edge table, footsteps, causal `explain()` and `explain_detail()`. 23 files parse. Nothing ran in Godot.
+- `docs/TEST_REPORT.md` is now rebuilt by `node tools/test_report.js`.

@@ -3,8 +3,8 @@ REPLAY B_heard_and_escaped: 157 inputs, ended WON at tick 894 (29.8 s), 2 echoes
   tick   50  ping_cast  {"castId":1,"origin":[3,5.780555555738523],"edges":172,"cooldownUntil":88}
   tick  507  ping_cast  {"castId":2,"origin":[10.99728138029907,16.82083909964883],"edges":451,"cooldownUntil":545}
   tick  537  heard_ping  {"predator":"listener-01","castId":2,"arrivalTick":537,"weightedCost":8.786,"origin":[10.99728138029907,16.82083909964883]}
-  tick  537  predator_state_changed  {"predator":"listener-01","from":"PATROL","to":"CURIOUS","reason":"heard ping 2"}
-  tick  710  predator_state_changed  {"predator":"listener-01","from":"CURIOUS","to":"SEARCH","reason":"reached last heard origin"}
+  tick  537  predator_state_changed  {"predator":"listener-01","from":"PATROL","to":"CURIOUS","reason":"heard ping 2","heardEvent":4}
+  tick  710  predator_state_changed  {"predator":"listener-01","from":"CURIOUS","to":"SEARCH","reason":"reached last heard origin","arrived":true}
   tick  785  predator_state_changed  {"predator":"listener-01","from":"SEARCH","to":"RECOVER","reason":"search finished"}
   tick  893  exit_reached  {"casts":2,"ticks":893}
   EXPLANATION: You reached the exit after 2 echoes. Echo 2 drew the listener toward where you cast it.
